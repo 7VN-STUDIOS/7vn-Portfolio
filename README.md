@@ -45,3 +45,4 @@ The admin page (`yoursite.netlify.app/admin.html`) lets you add or remove videos
 ## 5. Add a real domain later
 
 When you're ready to buy a domain: Netlify → Site settings → Domain management → Add a domain. Netlify walks you through pointing DNS at it. No code changes needed.
+
