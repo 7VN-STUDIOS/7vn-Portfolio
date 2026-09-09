@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Services — 7VN Studios</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="services.html">
+
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <section class="page-header">
+    <div class="wrap">
+      <h1 class="page-title">Services</h1>
+      <p style="color:var(--muted); max-width:520px;">Pricing below is a starting guide — every project gets a proper quote once we know the scope.</p>
+    </div>
+  </section>
+
+  <section class="reel-section">
+    <div class="wrap">
+      <div class="services-list" id="servicesList"></div>
+      <div class="more-cta">
+        <a href="contact.html" class="btn btn-primary">Request a quote</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script src="js/main.js"></script>
+<script>
+async function init() {
+  const config = await loadJSON('data/config.json');
+  document.getElementById('servicesList').innerHTML = config.services.map(s => `
+    <div class="service-row">
+      <div>
+        <h3>${s.name}</h3>
+        <p>${s.description}</p>
+      </div>
+      <div class="price">${s.price}</div>
+    </div>
+  `).join('');
+}
+init();
+</script>
+</body>
+</html>

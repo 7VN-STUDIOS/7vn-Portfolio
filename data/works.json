@@ -1,0 +1,82 @@
+[
+  {
+    "id": "events-1",
+    "category": "Events",
+    "title": "Sample Event Coverage 1",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real event coverage piece."
+  },
+  {
+    "id": "events-2",
+    "category": "Events",
+    "title": "Sample Event Coverage 2",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real event coverage piece."
+  },
+  {
+    "id": "youtube-1",
+    "category": "YouTube",
+    "title": "Sample YouTube Edit 1",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real YouTube edit."
+  },
+  {
+    "id": "youtube-2",
+    "category": "YouTube",
+    "title": "Sample YouTube Edit 2",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real YouTube edit."
+  },
+  {
+    "id": "reels-1",
+    "category": "Reels",
+    "title": "Sample Reel 1",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real reel."
+  },
+  {
+    "id": "reels-2",
+    "category": "Reels",
+    "title": "Sample Reel 2",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real reel."
+  },
+  {
+    "id": "motion-1",
+    "category": "Motion Designs",
+    "title": "Sample Motion Design 1",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real motion design piece."
+  },
+  {
+    "id": "motion-2",
+    "category": "Motion Designs",
+    "title": "Sample Motion Design 2",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real motion design piece."
+  },
+  {
+    "id": "2d-1",
+    "category": "2D Animations",
+    "title": "Sample 2D Animation 1",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real animation piece."
+  },
+  {
+    "id": "2d-2",
+    "category": "2D Animations",
+    "title": "Sample 2D Animation 2",
+    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
+    "thumbnail": "",
+    "description": "Placeholder — replace with a real animation piece."
+  }
+]

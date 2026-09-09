@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — 7VN Studios</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <div class="wrap">
+
+    <!-- Setup screen: shown until GitHub connection is configured -->
+    <div class="admin-lock" id="setupScreen">
+      <h1 class="page-title" style="font-size:2rem;">Connect to GitHub</h1>
+      <p style="color:var(--muted); margin-bottom:28px;">
+        This form saves directly to your GitHub repo, which redeploys your live site automatically.
+        You only need to do this setup once per browser.
+      </p>
+      <div class="form-field" style="text-align:left;">
+        <label for="ghOwner">GitHub username</label>
+        <input id="ghOwner" type="text" placeholder="e.g. sageFolayan">
+      </div>
+      <div class="form-field" style="text-align:left;">
+        <label for="ghRepo">Repository name</label>
+        <input id="ghRepo" type="text" placeholder="e.g. 7vn-portfolio">
+      </div>
+      <div class="form-field" style="text-align:left;">
+        <label for="ghBranch">Branch</label>
+        <input id="ghBranch" type="text" placeholder="main" value="main">
+      </div>
+      <div class="form-field" style="text-align:left;">
+        <label for="ghToken">Personal access token</label>
+        <input id="ghToken" type="password" placeholder="github_pat_...">
+      </div>
+      <button class="btn btn-primary" id="connectBtn" style="width:100%; justify-content:center;">Connect</button>
+      <p class="status-msg" id="setupStatus"></p>
+    </div>
+
+    <!-- Admin dashboard: shown once connected -->
+    <div id="adminDashboard" style="display:none;">
+      <div class="page-header" style="padding-top:60px;">
+        <h1 class="page-title" style="font-size:2.2rem;">Manage works</h1>
+        <button class="btn btn-outline btn-small" id="disconnectBtn">Disconnect</button>
+      </div>
+
+      <section class="reel-section" style="padding-top:48px;">
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;">Add a new piece</h2>
+        <div class="form-field">
+          <label for="newCategory">Category</label>
+          <select id="newCategory"></select>
+        </div>
+        <div class="form-field">
+          <label for="newTitle">Title</label>
+          <input id="newTitle" type="text" placeholder="e.g. Adaeze's Wedding Highlight">
+        </div>
+        <div class="form-field">
+          <label for="newVideoUrl">Video embed URL</label>
+          <input id="newVideoUrl" type="text" placeholder="https://www.youtube.com/embed/VIDEO_ID">
+        </div>
+        <div class="form-field">
+          <label for="newDescription">Short description (optional)</label>
+          <input id="newDescription" type="text" placeholder="One line about the piece">
+        </div>
+        <button class="btn btn-primary" id="addWorkBtn">Add &amp; publish</button>
+        <p class="status-msg" id="addStatus"></p>
+
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin:48px 0 16px;">Existing works</h2>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Category</th><th>Title</th><th></th></tr>
+          </thead>
+          <tbody id="worksTableBody"></tbody>
+        </table>
+        <p class="status-msg" id="tableStatus"></p>
+      </section>
+    </div>
+
+  </div>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script src="js/main.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

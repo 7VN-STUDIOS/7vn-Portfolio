@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">Work — 7VN Studios</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <section class="page-header">
+    <div class="wrap">
+      <h1 class="page-title" id="categoryTitle">Work</h1>
+      <p style="color:var(--muted);" id="categoryIntro"></p>
+    </div>
+  </section>
+
+  <section class="reel-section">
+    <div class="wrap">
+      <div class="work-grid" id="workGrid"></div>
+      <div class="more-cta" id="moreCta"></div>
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script src="js/main.js"></script>
+<script>
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get('category') || '';
+
+  const [config, works] = await Promise.all([
+    loadJSON('data/config.json'),
+    loadJSON('data/works.json'),
+  ]);
+
+  const cat = config.categories.find(c => c.slug === slug);
+  const catName = cat ? cat.name : 'Work';
+
+  document.title = `${catName} — 7VN Studios`;
+  document.getElementById('categoryTitle').textContent = catName;
+  document.getElementById('categoryIntro').textContent = `Selected ${catName.toLowerCase()} work.`;
+
+  const items = works.filter(w => w.category === catName).slice(0, 5);
+  const grid = document.getElementById('workGrid');
+
+  if (items.length === 0) {
+    grid.innerHTML = `<p style="color:var(--muted);">No pieces added yet — check back soon.</p>`;
+  } else {
+    grid.innerHTML = items.map(w => `
+      <div class="work-card">
+        <div class="thumb">
+          <iframe src="${w.videoUrl}" title="${w.title}" allowfullscreen loading="lazy"></iframe>
+        </div>
+        <div class="info">
+          <h3>${w.title}</h3>
+          <p>${w.description || ''}</p>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  if (cat && cat.driveUrl) {
+    document.getElementById('moreCta').innerHTML = `
+      <a href="${cat.driveUrl}" target="_blank" rel="noopener" class="btn btn-outline">See more on Google Drive</a>
+    `;
+  }
+}
+init();
+</script>
+</body>
+</html>
