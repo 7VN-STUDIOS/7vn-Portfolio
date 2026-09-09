@@ -1,13 +1,5 @@
 [
   {
-    "id": "2d-1",
-    "category": "2D Animations",
-    "title": "Sample 2D Animation 1",
-    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    "thumbnail": "",
-    "description": "Placeholder — replace with a real animation piece."
-  },
-  {
     "id": "2d-2",
     "category": "2D Animations",
     "title": "Sample 2D Animation 2",
