@@ -55,6 +55,32 @@ async function ghPutFile(path, content, sha, message) {
   return res.json();
 }
 
+function normalizeVideoUrl(raw) {
+  const url = raw.trim();
+
+  // Already a proper embed URL — leave it alone.
+  if (/youtube\.com\/embed\//.test(url) || /player\.vimeo\.com\/video\//.test(url)) {
+    return url;
+  }
+
+  // YouTube: watch?v=, youtu.be/, m.youtube.com, shorts/
+  let m = url.match(/(?:youtube\.com|m\.youtube\.com)\/watch\?v=([a-zA-Z0-9_-]{6,})/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+
+  m = url.match(/youtu\.be\/([a-zA-Z0-9_-]{6,})/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+
+  m = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{6,})/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+
+  // Vimeo: vimeo.com/123456789
+  m = url.match(/vimeo\.com\/(\d+)/);
+  if (m) return `https://player.vimeo.com/video/${m[1]}`;
+
+  // Unrecognized format — return as-is; the site will try it directly.
+  return url;
+}
+
 function setStatus(el, msg, type) {
   el.textContent = msg;
   el.className = 'status-msg' + (type ? ' ' + type : '');
@@ -113,14 +139,15 @@ async function addWork() {
   const addStatus = document.getElementById('addStatus');
   const category = document.getElementById('newCategory').value;
   const title = document.getElementById('newTitle').value.trim();
-  const videoUrl = document.getElementById('newVideoUrl').value.trim();
+  const rawVideoUrl = document.getElementById('newVideoUrl').value.trim();
   const description = document.getElementById('newDescription').value.trim();
 
-  if (!title || !videoUrl) {
+  if (!title || !rawVideoUrl) {
     setStatus(addStatus, 'Title and video URL are required.', 'error');
     return;
   }
 
+  const videoUrl = normalizeVideoUrl(rawVideoUrl);
   const id = `${category.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
   const newWork = { id, category, title, videoUrl, thumbnail: '', description };
 
