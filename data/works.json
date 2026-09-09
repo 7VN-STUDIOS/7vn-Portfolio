@@ -1,13 +1,5 @@
 [
   {
-    "id": "reels-1",
-    "category": "Reels",
-    "title": "Sample Reel 1",
-    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    "thumbnail": "",
-    "description": "Placeholder — replace with a real reel."
-  },
-  {
     "id": "reels-2",
     "category": "Reels",
     "title": "Sample Reel 2",
