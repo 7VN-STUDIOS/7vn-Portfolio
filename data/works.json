@@ -1,13 +1,5 @@
 [
   {
-    "id": "youtube-2",
-    "category": "YouTube",
-    "title": "Sample YouTube Edit 2",
-    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    "thumbnail": "",
-    "description": "Placeholder — replace with a real YouTube edit."
-  },
-  {
     "id": "reels-1",
     "category": "Reels",
     "title": "Sample Reel 1",
