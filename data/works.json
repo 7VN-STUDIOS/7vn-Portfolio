@@ -1,13 +1,5 @@
 [
   {
-    "id": "events-2",
-    "category": "Events",
-    "title": "Sample Event Coverage 2",
-    "videoUrl": "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    "thumbnail": "",
-    "description": "Placeholder — replace with a real event coverage piece."
-  },
-  {
     "id": "youtube-1",
     "category": "YouTube",
     "title": "Sample YouTube Edit 1",
