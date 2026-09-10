@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title id="pageTitle">Work — 7VN Studios</title>
+<title id="pageTitle">Work | 7VN Studios</title>
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
@@ -46,7 +46,7 @@ async function init() {
   const cat = config.categories.find(c => c.slug === slug);
   const catName = cat ? cat.name : 'Work';
 
-  document.title = `${catName} — 7VN Studios`;
+  document.title = `${catName} | 7VN Studios`;
   document.getElementById('categoryTitle').textContent = catName;
   document.getElementById('categoryIntro').textContent = `Selected ${catName.toLowerCase()} work.`;
 
@@ -54,7 +54,7 @@ async function init() {
   const grid = document.getElementById('workGrid');
 
   if (items.length === 0) {
-    grid.innerHTML = `<p style="color:var(--muted);">No pieces added yet — check back soon.</p>`;
+    grid.innerHTML = `<p style="color:var(--muted);">No pieces added yet. Check back soon.</p>`;
   } else {
     grid.innerHTML = items.map(w => `
       <div class="work-card">

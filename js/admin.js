@@ -1,5 +1,5 @@
 // Admin dashboard: reads/writes data/works.json directly to GitHub via the Contents API.
-// The token is stored ONLY in this browser's localStorage — never sent anywhere but api.github.com.
+// The token is stored ONLY in this browser's localStorage, never sent anywhere but api.github.com.
 
 const GH_KEY = '7vn_admin_gh_config';
 const WORKS_PATH = 'data/works.json';
@@ -58,7 +58,7 @@ async function ghPutFile(path, content, sha, message) {
 function normalizeVideoUrl(raw) {
   const url = raw.trim();
 
-  // Already a proper embed URL — leave it alone.
+  // Already a proper embed URL, leave it alone.
   if (/youtube\.com\/embed\//.test(url) || /player\.vimeo\.com\/video\//.test(url)) {
     return url;
   }
@@ -77,7 +77,7 @@ function normalizeVideoUrl(raw) {
   m = url.match(/vimeo\.com\/(\d+)/);
   if (m) return `https://player.vimeo.com/video/${m[1]}`;
 
-  // Unrecognized format — return as-is; the site will try it directly.
+  // Unrecognized format, return as-is; the site will try it directly.
   return url;
 }
 
@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showDashboard();
     } catch (e) {
       showSetup();
-      setStatus(document.getElementById('setupStatus'), 'Saved connection failed — please reconnect. ' + e.message, 'error');
+      setStatus(document.getElementById('setupStatus'), 'Saved connection failed. Please reconnect. ' + e.message, 'error');
     }
   }
 });

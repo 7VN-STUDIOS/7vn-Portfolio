@@ -181,7 +181,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .btn-outline { border-color: var(--border); color: var(--cream); }
 .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
 
-/* Category grid — editorial, asymmetric, not identical SaaS cards */
+/* Category grid: editorial, asymmetric, not identical SaaS cards */
 .reel-section { padding: 90px 0; border-bottom: 1px solid var(--border); }
 
 .section-head {
