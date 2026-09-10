@@ -62,7 +62,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   height: 76px;
 }
 
-.brand img { height: 69px; width: auto; }
+.brand img { height: 100px; width: auto; }
 
 .nav-links {
   display: flex;
@@ -370,7 +370,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   font-size: 0.85rem;
 }
 
-.site-footer img { height: 60px; opacity: 0.7; }
+.site-footer img { height: 100px; opacity: 0.7; }
 
 .footer-links { display: flex; gap: 20px; }
 .footer-links a:hover { color: var(--gold); }
