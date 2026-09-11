@@ -61,7 +61,7 @@
       </div>
 
       <section class="reel-section" style="padding-top:48px;">
-        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;">Add a new piece</h2>
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;" id="formHeading">Add a new piece</h2>
         <div class="form-field">
           <label for="newCategory">Category</label>
           <select id="newCategory"></select>
@@ -75,16 +75,21 @@
           <input id="newVideoUrl" type="text" placeholder="Paste any YouTube or Vimeo link, and it will be converted automatically">
         </div>
         <div class="form-field">
+          <label for="newThumbnail">Thumbnail image URL (optional)</label>
+          <input id="newThumbnail" type="text" placeholder="Leave blank to use the YouTube thumbnail automatically">
+        </div>
+        <div class="form-field">
           <label for="newDescription">Short description (optional)</label>
           <input id="newDescription" type="text" placeholder="One line about the piece">
         </div>
         <button class="btn btn-primary" id="addWorkBtn">Add &amp; publish</button>
+        <button class="btn btn-outline btn-small" id="cancelEditBtn" style="display:none; margin-left:12px;">Cancel edit</button>
         <p class="status-msg" id="addStatus"></p>
 
         <h2 style="font-family:var(--serif); font-size:1.4rem; margin:48px 0 16px;">Existing works</h2>
         <table class="admin-table">
           <thead>
-            <tr><th>Category</th><th>Title</th><th></th></tr>
+            <tr><th>Order</th><th>Category</th><th>Title</th><th></th></tr>
           </thead>
           <tbody id="worksTableBody"></tbody>
         </table>

@@ -73,8 +73,9 @@ async function init() {
     const thumbCache = {};
 
     function facadeInner(w, ytId) {
-      const src = thumbCache[ytId] || `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
-      return `<img src="${src}" alt="${w.title}" loading="lazy" data-yt-id="${ytId}" class="yt-thumb-img">
+      const src = w.thumbnail || thumbCache[ytId] || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : '');
+      const trackAttr = (!w.thumbnail && ytId) ? `data-yt-id="${ytId}" class="yt-thumb-img"` : '';
+      return `<img src="${src}" alt="${w.title}" loading="lazy" ${trackAttr}>
         <button class="play-btn" aria-label="Play ${w.title}">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         </button>`;
@@ -87,7 +88,8 @@ async function init() {
 
     grid.innerHTML = items.map((w, i) => {
       const ytId = getYouTubeId(w.videoUrl);
-      const thumbHtml = ytId
+      const canFacade = ytId || w.thumbnail;
+      const thumbHtml = canFacade
         ? `<div class="thumb yt-facade" data-embed-url="${w.videoUrl}" data-index="${i}">${facadeInner(w, ytId)}</div>`
         : `<div class="thumb"><iframe src="${w.videoUrl}" title="${w.title}" allowfullscreen loading="lazy"></iframe></div>`;
 

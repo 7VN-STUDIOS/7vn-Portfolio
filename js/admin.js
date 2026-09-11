@@ -9,6 +9,7 @@ let ghConfig = null;   // { owner, repo, branch, token }
 let worksCache = [];   // current works.json content
 let worksSha = null;   // current file sha (needed to update)
 let categories = [];   // from config.json
+let editingId = null;  // id of the work currently being edited, or null when adding new
 
 function b64EncodeUnicode(str) {
   return btoa(unescape(encodeURIComponent(str)));
@@ -101,23 +102,73 @@ function renderCategoryOptions() {
   sel.innerHTML = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
 }
 
+function categoryIndices(category) {
+  const out = [];
+  worksCache.forEach((w, i) => { if (w.category === category) out.push(i); });
+  return out;
+}
+
 function renderWorksTable() {
   const body = document.getElementById('worksTableBody');
   if (worksCache.length === 0) {
-    body.innerHTML = `<tr><td colspan="3" style="color:var(--muted);">No works yet.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="4" style="color:var(--muted);">No works yet.</td></tr>`;
     return;
   }
-  body.innerHTML = worksCache.map(w => `
+  body.innerHTML = worksCache.map((w) => {
+    const indices = categoryIndices(w.category);
+    const posInCategory = indices.indexOf(worksCache.indexOf(w));
+    const isFirst = posInCategory === 0;
+    const isLast = posInCategory === indices.length - 1;
+    return `
     <tr>
+      <td>
+        <button class="btn btn-outline btn-small" data-move="up" data-id="${w.id}" ${isFirst ? 'disabled' : ''} aria-label="Move up">&uarr;</button>
+        <button class="btn btn-outline btn-small" data-move="down" data-id="${w.id}" ${isLast ? 'disabled' : ''} aria-label="Move down">&darr;</button>
+      </td>
       <td>${w.category}</td>
       <td>${w.title}</td>
-      <td><button class="btn btn-outline btn-small btn-danger" data-id="${w.id}">Delete</button></td>
+      <td>
+        <button class="btn btn-outline btn-small" data-edit="${w.id}">Edit</button>
+        <button class="btn btn-outline btn-small btn-danger" data-delete="${w.id}">Delete</button>
+      </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
-  body.querySelectorAll('button[data-id]').forEach(btn => {
-    btn.addEventListener('click', () => deleteWork(btn.getAttribute('data-id')));
+  body.querySelectorAll('button[data-delete]').forEach(btn => {
+    btn.addEventListener('click', () => deleteWork(btn.getAttribute('data-delete')));
   });
+  body.querySelectorAll('button[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => startEdit(btn.getAttribute('data-edit')));
+  });
+  body.querySelectorAll('button[data-move]').forEach(btn => {
+    btn.addEventListener('click', () => moveWork(btn.getAttribute('data-id'), btn.getAttribute('data-move')));
+  });
+}
+
+async function moveWork(id, direction) {
+  const tableStatus = document.getElementById('tableStatus');
+  const work = worksCache.find(w => w.id === id);
+  if (!work) return;
+
+  const indices = categoryIndices(work.category);
+  const pos = indices.indexOf(worksCache.indexOf(work));
+  const swapPos = direction === 'up' ? pos - 1 : pos + 1;
+  if (swapPos < 0 || swapPos >= indices.length) return;
+
+  const i = indices[pos];
+  const j = indices[swapPos];
+  [worksCache[i], worksCache[j]] = [worksCache[j], worksCache[i]];
+
+  setStatus(tableStatus, 'Reordering…', '');
+  try {
+    const result = await ghPutFile(WORKS_PATH, worksCache, worksSha, `Reorder works via admin`);
+    worksSha = result.content.sha;
+    renderWorksTable();
+    setStatus(tableStatus, 'Order updated and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(tableStatus, e.message, 'error');
+  }
 }
 
 async function deleteWork(id) {
@@ -128,6 +179,7 @@ async function deleteWork(id) {
     worksCache = worksCache.filter(w => w.id !== id);
     const result = await ghPutFile(WORKS_PATH, worksCache, worksSha, `Remove work ${id} via admin`);
     worksSha = result.content.sha;
+    if (editingId === id) cancelEdit();
     renderWorksTable();
     setStatus(tableStatus, 'Deleted and published. Live site updates in about a minute.', 'success');
   } catch (e) {
@@ -135,11 +187,42 @@ async function deleteWork(id) {
   }
 }
 
-async function addWork() {
+function startEdit(id) {
+  const work = worksCache.find(w => w.id === id);
+  if (!work) return;
+  editingId = id;
+
+  document.getElementById('newCategory').value = work.category;
+  document.getElementById('newTitle').value = work.title;
+  document.getElementById('newVideoUrl').value = work.videoUrl;
+  document.getElementById('newThumbnail').value = work.thumbnail || '';
+  document.getElementById('newDescription').value = work.description || '';
+
+  document.getElementById('formHeading').textContent = `Editing: ${work.title}`;
+  document.getElementById('addWorkBtn').textContent = 'Save changes';
+  document.getElementById('cancelEditBtn').style.display = 'inline-flex';
+
+  document.getElementById('formHeading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('newTitle').value = '';
+  document.getElementById('newVideoUrl').value = '';
+  document.getElementById('newThumbnail').value = '';
+  document.getElementById('newDescription').value = '';
+  document.getElementById('formHeading').textContent = 'Add a new piece';
+  document.getElementById('addWorkBtn').textContent = 'Add & publish';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  setStatus(document.getElementById('addStatus'), '', '');
+}
+
+async function saveWork() {
   const addStatus = document.getElementById('addStatus');
   const category = document.getElementById('newCategory').value;
   const title = document.getElementById('newTitle').value.trim();
   const rawVideoUrl = document.getElementById('newVideoUrl').value.trim();
+  const thumbnail = document.getElementById('newThumbnail').value.trim();
   const description = document.getElementById('newDescription').value.trim();
 
   if (!title || !rawVideoUrl) {
@@ -148,19 +231,24 @@ async function addWork() {
   }
 
   const videoUrl = normalizeVideoUrl(rawVideoUrl);
-  const id = `${category.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
-  const newWork = { id, category, title, videoUrl, thumbnail: '', description };
+  const isEditing = !!editingId;
 
-  setStatus(addStatus, 'Publishing…', '');
+  setStatus(addStatus, isEditing ? 'Saving changes…' : 'Publishing…', '');
   try {
-    worksCache = [...worksCache, newWork];
-    const result = await ghPutFile(WORKS_PATH, worksCache, worksSha, `Add work "${title}" via admin`);
+    if (isEditing) {
+      const idx = worksCache.findIndex(w => w.id === editingId);
+      if (idx === -1) throw new Error('Could not find that work anymore. It may have been deleted elsewhere.');
+      worksCache[idx] = { ...worksCache[idx], category, title, videoUrl, thumbnail, description };
+    } else {
+      const id = `${category.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+      worksCache = [...worksCache, { id, category, title, videoUrl, thumbnail, description }];
+    }
+
+    const result = await ghPutFile(WORKS_PATH, worksCache, worksSha, isEditing ? `Edit work "${title}" via admin` : `Add work "${title}" via admin`);
     worksSha = result.content.sha;
     renderWorksTable();
-    document.getElementById('newTitle').value = '';
-    document.getElementById('newVideoUrl').value = '';
-    document.getElementById('newDescription').value = '';
-    setStatus(addStatus, 'Published! Live site updates in about a minute.', 'success');
+    cancelEdit();
+    setStatus(addStatus, isEditing ? 'Changes saved and published. Live site updates in about a minute.' : 'Published! Live site updates in about a minute.', 'success');
   } catch (e) {
     setStatus(addStatus, e.message, 'error');
   }
@@ -199,7 +287,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  document.getElementById('addWorkBtn').addEventListener('click', addWork);
+  document.getElementById('addWorkBtn').addEventListener('click', saveWork);
+  document.getElementById('cancelEditBtn').addEventListener('click', cancelEdit);
 
   document.getElementById('disconnectBtn').addEventListener('click', () => {
     localStorage.removeItem(GH_KEY);

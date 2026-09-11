@@ -455,6 +455,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .admin-table th, .admin-table td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); }
 .admin-table th { color: var(--muted); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .btn-small { padding: 8px 14px; font-size: 0.82rem; }
+.admin-table td:first-child .btn-small { padding: 6px 10px; margin-right: 6px; }
+.admin-table td:last-child .btn-small { margin-right: 8px; }
+.btn-small:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-small:disabled:hover { border-color: var(--border); color: var(--cream); }
 .btn-danger { color: #d4756b; border-color: rgba(212,117,107,0.4); }
 .btn-danger:hover { background: rgba(212,117,107,0.1); border-color: #d4756b; }
 .status-msg { margin-top: 16px; font-size: 0.9rem; }
