@@ -101,6 +101,18 @@
       </section>
 
       <section class="reel-section" style="padding-top:0;">
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;">Pending reviews</h2>
+        <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">Submitted from the site. Approve to publish instantly, or reject to dismiss.</p>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Name</th><th>Review</th><th></th></tr>
+          </thead>
+          <tbody id="pendingReviewsTableBody"></tbody>
+        </table>
+        <p class="status-msg" id="pendingReviewsStatus"></p>
+      </section>
+
+      <section class="reel-section" style="padding-top:0;">
         <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;" id="reviewFormHeading">Add a review</h2>
         <div class="form-field">
           <label for="newReviewName">Client name</label>

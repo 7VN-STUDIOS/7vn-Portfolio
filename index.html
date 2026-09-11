@@ -77,7 +77,8 @@
       <textarea id="reviewText"></textarea>
     </div>
     <button class="btn btn-primary" id="submitReview" style="width:100%; justify-content:center;">Send review</button>
-    <p style="color:var(--muted); font-size:0.8rem; margin-top:14px;">This opens your email app. We read every submission and publish the ones we feature on the site.</p>
+    <p class="status-msg" id="reviewSubmitStatus"></p>
+    <p style="color:var(--muted); font-size:0.8rem; margin-top:14px;">We read every submission and publish the ones we feature on the site.</p>
   </div>
 </div>
 
@@ -85,6 +86,13 @@
 
 <script src="js/main.js"></script>
 <script>
+const REVIEWS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzXg30Y6vXERrkT2q3yxWHdBgyhp_HIS1bh1ZOGEEPL6jvUkqN05_6GI5rr3V4-p7vG/exec';
+
+function setStatus(el, msg, type) {
+  el.textContent = msg;
+  el.className = 'status-msg' + (type ? ' ' + type : '');
+}
+
 async function init() {
   const config = await loadJSON('data/config.json');
   const grid = document.getElementById('categoryGrid');
@@ -162,17 +170,33 @@ async function init() {
     }
   });
 
-  document.getElementById('submitReview').addEventListener('click', () => {
+  document.getElementById('submitReview').addEventListener('click', async () => {
     const name = document.getElementById('reviewName').value.trim();
     const role = document.getElementById('reviewRole').value.trim();
     const text = document.getElementById('reviewText').value.trim();
+    const status = document.getElementById('reviewSubmitStatus');
     if (!name || !text) {
-      alert('Please add your name and a review before sending.');
+      setStatus(status, 'Please add your name and a review before sending.', 'error');
       return;
     }
-    const subject = encodeURIComponent(`New review from ${name}`);
-    const body = encodeURIComponent(`${text}\n\nFrom: ${name}${role ? ' (' + role + ')' : ''}`);
-    window.location.href = `mailto:${config.contact.email}?subject=${subject}&body=${body}`;
+
+    setStatus(status, 'Sending…', '');
+    try {
+      const res = await fetch(REVIEWS_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'submit', name, role, text }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Something went wrong.');
+
+      setStatus(status, 'Thank you! Your review has been sent for approval.', 'success');
+      document.getElementById('reviewName').value = '';
+      document.getElementById('reviewRole').value = '';
+      document.getElementById('reviewText').value = '';
+      setTimeout(closeModal, 1800);
+    } catch (e) {
+      setStatus(status, 'Could not send right now. Please try again shortly.', 'error');
+    }
   });
 }
 init();

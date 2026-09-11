@@ -5,6 +5,8 @@ const GH_KEY = '7vn_admin_gh_config';
 const WORKS_PATH = 'data/works.json';
 const CONFIG_PATH = 'data/config.json';
 const REVIEWS_PATH = 'data/reviews.json';
+const REVIEWS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzXg30Y6vXERrkT2q3yxWHdBgyhp_HIS1bh1ZOGEEPL6jvUkqN05_6GI5rr3V4-p7vG/exec';
+const REVIEWS_SECRET = 'Eminent';
 
 let ghConfig = null;   // { owner, repo, branch, token }
 let worksCache = [];   // current works.json content
@@ -262,6 +264,89 @@ async function saveWork() {
   }
 }
 
+async function fetchPendingReviews() {
+  const status = document.getElementById('pendingReviewsStatus');
+  const body = document.getElementById('pendingReviewsTableBody');
+  setStatus(status, 'Loading…', '');
+  try {
+    const url = `${REVIEWS_ENDPOINT}?action=pending&key=${encodeURIComponent(REVIEWS_SECRET)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not load pending reviews.');
+
+    if (data.pending.length === 0) {
+      body.innerHTML = `<tr><td colspan="3" style="color:var(--muted);">No pending reviews right now.</td></tr>`;
+    } else {
+      body.innerHTML = data.pending.map(p => `
+        <tr>
+          <td>${p.name}${p.role ? ` <span style="color:var(--muted); font-size:0.8rem;">(${p.role})</span>` : ''}</td>
+          <td style="max-width:360px;">${p.text}</td>
+          <td>
+            <button class="btn btn-outline btn-small" data-approve="${p.rowId}" data-name="${p.name}" data-role="${p.role || ''}" data-text="${p.text.replace(/"/g, '&quot;')}">Approve</button>
+            <button class="btn btn-outline btn-small btn-danger" data-reject="${p.rowId}">Reject</button>
+          </td>
+        </tr>
+      `).join('');
+
+      body.querySelectorAll('button[data-approve]').forEach(btn => {
+        btn.addEventListener('click', () => approvePendingReview(
+          btn.getAttribute('data-approve'),
+          btn.getAttribute('data-name'),
+          btn.getAttribute('data-role'),
+          btn.getAttribute('data-text')
+        ));
+      });
+      body.querySelectorAll('button[data-reject]').forEach(btn => {
+        btn.addEventListener('click', () => rejectPendingReview(btn.getAttribute('data-reject')));
+      });
+    }
+    setStatus(status, '', '');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+async function callReviewsBackend(action, rowId) {
+  const res = await fetch(REVIEWS_ENDPOINT, {
+    method: 'POST',
+    body: JSON.stringify({ action, rowId, key: REVIEWS_SECRET }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Action failed.');
+}
+
+async function approvePendingReview(rowId, name, role, text) {
+  const status = document.getElementById('pendingReviewsStatus');
+  setStatus(status, 'Approving and publishing…', '');
+  try {
+    await callReviewsBackend('approve', rowId);
+
+    const id = `review-${Date.now()}`;
+    reviewsCache = [...reviewsCache, { id, name, role, text }];
+    const result = await ghPutFile(REVIEWS_PATH, reviewsCache, reviewsSha, `Approve review from ${name} via admin`);
+    reviewsSha = result.content.sha;
+    renderReviewsTable();
+
+    await fetchPendingReviews();
+    setStatus(status, 'Approved and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+async function rejectPendingReview(rowId) {
+  const status = document.getElementById('pendingReviewsStatus');
+  if (!confirm('Reject this review? It will be dismissed and won\'t show as pending again.')) return;
+  setStatus(status, 'Rejecting…', '');
+  try {
+    await callReviewsBackend('reject', rowId);
+    await fetchPendingReviews();
+    setStatus(status, 'Rejected.', 'success');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
 function renderReviewsTable() {
   const body = document.getElementById('reviewsTableBody');
   if (reviewsCache.length === 0) {
@@ -394,6 +479,7 @@ function showDashboard() {
   renderCategoryOptions();
   renderWorksTable();
   renderReviewsTable();
+  fetchPendingReviews();
 }
 
 function showSetup() {
