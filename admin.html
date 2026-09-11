@@ -99,6 +99,34 @@
           <a href="#" id="disconnectBtn" style="color:var(--muted); font-size:0.85rem;">Disconnect this browser from GitHub</a>
         </div>
       </section>
+
+      <section class="reel-section" style="padding-top:0;">
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;" id="reviewFormHeading">Add a review</h2>
+        <div class="form-field">
+          <label for="newReviewName">Client name</label>
+          <input id="newReviewName" type="text" placeholder="e.g. Adaeze O.">
+        </div>
+        <div class="form-field">
+          <label for="newReviewRole">Role or company (optional)</label>
+          <input id="newReviewRole" type="text" placeholder="e.g. Bride, or Founder at [Brand]">
+        </div>
+        <div class="form-field">
+          <label for="newReviewText">Review text</label>
+          <textarea id="newReviewText" placeholder="What they said"></textarea>
+        </div>
+        <button class="btn btn-primary" id="addReviewBtn">Add &amp; publish</button>
+        <button class="btn btn-outline btn-small" id="cancelReviewEditBtn" style="display:none; margin-left:12px;">Cancel edit</button>
+        <p class="status-msg" id="reviewAddStatus"></p>
+
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin:48px 0 16px;">Existing reviews</h2>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Order</th><th>Name</th><th></th></tr>
+          </thead>
+          <tbody id="reviewsTableBody"></tbody>
+        </table>
+        <p class="status-msg" id="reviewTableStatus"></p>
+      </section>
     </div>
 
   </div>

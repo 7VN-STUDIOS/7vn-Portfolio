@@ -46,7 +46,38 @@
       <div class="category-grid" id="categoryGrid"></div>
     </div>
   </section>
+
+  <section class="reel-section" id="reviews">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>What clients say</h2>
+        <button class="btn btn-outline" id="openReviewModal">Add a review</button>
+      </div>
+      <div class="reviews-row" id="reviewsRow"></div>
+    </div>
+  </section>
 </main>
+
+<div class="modal-overlay" id="reviewModalOverlay">
+  <div class="modal-panel">
+    <button class="modal-close" id="closeReviewModal" aria-label="Close">&times;</button>
+    <h3 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:20px;">Share your experience</h3>
+    <div class="form-field">
+      <label for="reviewName">Your name</label>
+      <input id="reviewName" type="text">
+    </div>
+    <div class="form-field">
+      <label for="reviewRole">Role or company (optional)</label>
+      <input id="reviewRole" type="text">
+    </div>
+    <div class="form-field">
+      <label for="reviewText">Your review</label>
+      <textarea id="reviewText"></textarea>
+    </div>
+    <button class="btn btn-primary" id="submitReview" style="width:100%; justify-content:center;">Send review</button>
+    <p style="color:var(--muted); font-size:0.8rem; margin-top:14px;">This opens your email app. We read every submission and publish the ones we feature on the site.</p>
+  </div>
+</div>
 
 <footer id="site-footer"></footer>
 
@@ -65,6 +96,44 @@ async function init() {
       </div>
     </a>
   `).join('');
+
+  const reviews = await loadJSON('data/reviews.json');
+  const row = document.getElementById('reviewsRow');
+  if (reviews.length === 0) {
+    row.innerHTML = `<p style="color:var(--muted);">No reviews yet. Be the first to add one.</p>`;
+  } else {
+    row.innerHTML = reviews.map(r => `
+      <div class="review-card">
+        <p class="review-text">${r.text}</p>
+        <div class="review-name">${r.name}</div>
+        ${r.role ? `<div class="review-role">${r.role}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  const overlay = document.getElementById('reviewModalOverlay');
+  document.getElementById('openReviewModal').addEventListener('click', () => {
+    overlay.classList.add('open');
+  });
+  document.getElementById('closeReviewModal').addEventListener('click', () => {
+    overlay.classList.remove('open');
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+
+  document.getElementById('submitReview').addEventListener('click', () => {
+    const name = document.getElementById('reviewName').value.trim();
+    const role = document.getElementById('reviewRole').value.trim();
+    const text = document.getElementById('reviewText').value.trim();
+    if (!name || !text) {
+      alert('Please add your name and a review before sending.');
+      return;
+    }
+    const subject = encodeURIComponent(`New review from ${name}`);
+    const body = encodeURIComponent(`${text}\n\nFrom: ${name}${role ? ' (' + role + ')' : ''}`);
+    window.location.href = `mailto:${config.contact.email}?subject=${subject}&body=${body}`;
+  });
 }
 init();
 </script>

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "review-1",
+    "name": "Sample Client",
+    "role": "Placeholder role or company",
+    "text": "Placeholder review text. Replace with a real client review from the admin page."
+  },
+  {
+    "id": "review-2",
+    "name": "Sample Client",
+    "role": "Placeholder role or company",
+    "text": "Placeholder review text. Replace with a real client review from the admin page."
+  }
+]

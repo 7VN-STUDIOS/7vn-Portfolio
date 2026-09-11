@@ -4,12 +4,17 @@
 const GH_KEY = '7vn_admin_gh_config';
 const WORKS_PATH = 'data/works.json';
 const CONFIG_PATH = 'data/config.json';
+const REVIEWS_PATH = 'data/reviews.json';
 
 let ghConfig = null;   // { owner, repo, branch, token }
 let worksCache = [];   // current works.json content
 let worksSha = null;   // current file sha (needed to update)
 let categories = [];   // from config.json
 let editingId = null;  // id of the work currently being edited, or null when adding new
+
+let reviewsCache = [];
+let reviewsSha = null;
+let editingReviewId = null;
 
 function b64EncodeUnicode(str) {
   return btoa(unescape(encodeURIComponent(str)));
@@ -94,6 +99,9 @@ async function connect(owner, repo, branch, token) {
   worksSha = sha;
   const { content: config } = await ghGetFile(CONFIG_PATH);
   categories = config.categories || [];
+  const { content: reviews, sha: reviewsShaVal } = await ghGetFile(REVIEWS_PATH);
+  reviewsCache = reviews;
+  reviewsSha = reviewsShaVal;
   localStorage.setItem(GH_KEY, JSON.stringify(ghConfig));
 }
 
@@ -254,11 +262,138 @@ async function saveWork() {
   }
 }
 
+function renderReviewsTable() {
+  const body = document.getElementById('reviewsTableBody');
+  if (reviewsCache.length === 0) {
+    body.innerHTML = `<tr><td colspan="3" style="color:var(--muted);">No reviews yet.</td></tr>`;
+    return;
+  }
+  body.innerHTML = reviewsCache.map((r, i) => `
+    <tr>
+      <td>
+        <button class="btn btn-outline btn-small" data-review-move="up" data-review-id="${r.id}" ${i === 0 ? 'disabled' : ''} aria-label="Move up">&uarr;</button>
+        <button class="btn btn-outline btn-small" data-review-move="down" data-review-id="${r.id}" ${i === reviewsCache.length - 1 ? 'disabled' : ''} aria-label="Move down">&darr;</button>
+      </td>
+      <td>${r.name}</td>
+      <td>
+        <button class="btn btn-outline btn-small" data-review-edit="${r.id}">Edit</button>
+        <button class="btn btn-outline btn-small btn-danger" data-review-delete="${r.id}">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  body.querySelectorAll('button[data-review-delete]').forEach(btn => {
+    btn.addEventListener('click', () => deleteReview(btn.getAttribute('data-review-delete')));
+  });
+  body.querySelectorAll('button[data-review-edit]').forEach(btn => {
+    btn.addEventListener('click', () => startReviewEdit(btn.getAttribute('data-review-edit')));
+  });
+  body.querySelectorAll('button[data-review-move]').forEach(btn => {
+    btn.addEventListener('click', () => moveReview(btn.getAttribute('data-review-id'), btn.getAttribute('data-review-move')));
+  });
+}
+
+async function moveReview(id, direction) {
+  const tableStatus = document.getElementById('reviewTableStatus');
+  const idx = reviewsCache.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= reviewsCache.length) return;
+
+  [reviewsCache[idx], reviewsCache[swapIdx]] = [reviewsCache[swapIdx], reviewsCache[idx]];
+
+  setStatus(tableStatus, 'Reordering…', '');
+  try {
+    const result = await ghPutFile(REVIEWS_PATH, reviewsCache, reviewsSha, 'Reorder reviews via admin');
+    reviewsSha = result.content.sha;
+    renderReviewsTable();
+    setStatus(tableStatus, 'Order updated and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(tableStatus, e.message, 'error');
+  }
+}
+
+async function deleteReview(id) {
+  const tableStatus = document.getElementById('reviewTableStatus');
+  if (!confirm('Delete this review? This publishes immediately.')) return;
+  setStatus(tableStatus, 'Deleting…', '');
+  try {
+    reviewsCache = reviewsCache.filter(r => r.id !== id);
+    const result = await ghPutFile(REVIEWS_PATH, reviewsCache, reviewsSha, `Remove review ${id} via admin`);
+    reviewsSha = result.content.sha;
+    if (editingReviewId === id) cancelReviewEdit();
+    renderReviewsTable();
+    setStatus(tableStatus, 'Deleted and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(tableStatus, e.message, 'error');
+  }
+}
+
+function startReviewEdit(id) {
+  const review = reviewsCache.find(r => r.id === id);
+  if (!review) return;
+  editingReviewId = id;
+
+  document.getElementById('newReviewName').value = review.name;
+  document.getElementById('newReviewRole').value = review.role || '';
+  document.getElementById('newReviewText').value = review.text;
+
+  document.getElementById('reviewFormHeading').textContent = `Editing review: ${review.name}`;
+  document.getElementById('addReviewBtn').textContent = 'Save changes';
+  document.getElementById('cancelReviewEditBtn').style.display = 'inline-flex';
+  document.getElementById('reviewFormHeading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelReviewEdit() {
+  editingReviewId = null;
+  document.getElementById('newReviewName').value = '';
+  document.getElementById('newReviewRole').value = '';
+  document.getElementById('newReviewText').value = '';
+  document.getElementById('reviewFormHeading').textContent = 'Add a review';
+  document.getElementById('addReviewBtn').textContent = 'Add & publish';
+  document.getElementById('cancelReviewEditBtn').style.display = 'none';
+  setStatus(document.getElementById('reviewAddStatus'), '', '');
+}
+
+async function saveReview() {
+  const addStatus = document.getElementById('reviewAddStatus');
+  const name = document.getElementById('newReviewName').value.trim();
+  const role = document.getElementById('newReviewRole').value.trim();
+  const text = document.getElementById('newReviewText').value.trim();
+
+  if (!name || !text) {
+    setStatus(addStatus, 'Name and review text are required.', 'error');
+    return;
+  }
+
+  const isEditing = !!editingReviewId;
+  setStatus(addStatus, isEditing ? 'Saving changes…' : 'Publishing…', '');
+  try {
+    if (isEditing) {
+      const idx = reviewsCache.findIndex(r => r.id === editingReviewId);
+      if (idx === -1) throw new Error('Could not find that review anymore. It may have been deleted elsewhere.');
+      reviewsCache[idx] = { ...reviewsCache[idx], name, role, text };
+    } else {
+      const id = `review-${Date.now()}`;
+      reviewsCache = [...reviewsCache, { id, name, role, text }];
+    }
+
+    const result = await ghPutFile(REVIEWS_PATH, reviewsCache, reviewsSha, isEditing ? `Edit review "${name}" via admin` : `Add review "${name}" via admin`);
+    reviewsSha = result.content.sha;
+    renderReviewsTable();
+    cancelReviewEdit();
+    setStatus(addStatus, isEditing ? 'Changes saved and published. Live site updates in about a minute.' : 'Published! Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(addStatus, e.message, 'error');
+  }
+}
+
 function showDashboard() {
   document.getElementById('setupScreen').style.display = 'none';
   document.getElementById('adminDashboard').style.display = 'block';
   renderCategoryOptions();
   renderWorksTable();
+  renderReviewsTable();
 }
 
 function showSetup() {
@@ -289,6 +424,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('addWorkBtn').addEventListener('click', saveWork);
   document.getElementById('cancelEditBtn').addEventListener('click', cancelEdit);
+
+  document.getElementById('addReviewBtn').addEventListener('click', saveReview);
+  document.getElementById('cancelReviewEditBtn').addEventListener('click', cancelReviewEdit);
 
   document.getElementById('disconnectBtn').addEventListener('click', (e) => {
     e.preventDefault();
