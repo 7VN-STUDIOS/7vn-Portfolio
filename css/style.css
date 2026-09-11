@@ -281,6 +281,34 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   width: 100%; height: 100%; object-fit: cover; border: 0;
 }
 
+.yt-facade {
+  position: relative;
+  cursor: pointer;
+}
+
+.play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(18, 10, 11, 0.75);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.yt-facade:hover .play-btn {
+  background: var(--gold);
+  color: var(--black);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
 .work-card .info { padding: 20px; }
 .work-card h3 { font-family: var(--serif); font-size: 1.1rem; font-weight: 500; }
 .work-card p { color: var(--muted); font-size: 0.9rem; margin-top: 8px; }
