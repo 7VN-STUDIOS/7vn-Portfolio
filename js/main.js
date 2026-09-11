@@ -3,6 +3,7 @@
 function renderHeader(active) {
   const links = [
     { href: 'index.html', label: 'Home' },
+    { href: 'index.html#work', label: 'Portfolio' },
     { href: 'about.html', label: 'About' },
     { href: 'services.html', label: 'Services' },
     { href: 'contact.html', label: 'Contact' },

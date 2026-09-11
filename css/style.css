@@ -128,6 +128,15 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   border-bottom: 1px solid var(--border);
 }
 
+@media (max-width: 760px) {
+  .hero {
+    min-height: 100svh;
+    display: flex;
+    align-items: center;
+    padding: 100px 0;
+  }
+}
+
 .hero::before {
   content: '';
   position: absolute;
