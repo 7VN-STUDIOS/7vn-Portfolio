@@ -50,10 +50,12 @@
   <section class="reel-section" id="reviews">
     <div class="wrap">
       <div class="section-head">
-        <h2>What clients say</h2>
-        <button class="btn btn-outline" id="openReviewModal">Add a review</button>
+        <h2>Testimonials</h2>
       </div>
       <div class="reviews-row" id="reviewsRow"></div>
+      <div class="more-cta">
+        <button class="btn btn-outline" id="openReviewModal">Add a review</button>
+      </div>
     </div>
   </section>
 </main>
@@ -112,14 +114,52 @@ async function init() {
   }
 
   const overlay = document.getElementById('reviewModalOverlay');
-  document.getElementById('openReviewModal').addEventListener('click', () => {
+  const modalPanel = overlay.querySelector('.modal-panel');
+  const mainEl = document.querySelector('main');
+  const headerEl = document.getElementById('site-header');
+  const footerEl = document.getElementById('site-footer');
+
+  function openModal() {
     overlay.classList.add('open');
-  });
-  document.getElementById('closeReviewModal').addEventListener('click', () => {
+    document.body.style.overflow = 'hidden';
+    // Prevent tabbing/clicking into the rest of the page while the modal is open.
+    if (mainEl) mainEl.setAttribute('inert', '');
+    if (headerEl) headerEl.setAttribute('inert', '');
+    if (footerEl) footerEl.setAttribute('inert', '');
+    document.getElementById('reviewName').focus();
+  }
+
+  function closeModal() {
     overlay.classList.remove('open');
-  });
+    document.body.style.overflow = '';
+    if (mainEl) mainEl.removeAttribute('inert');
+    if (headerEl) headerEl.removeAttribute('inert');
+    if (footerEl) footerEl.removeAttribute('inert');
+    document.getElementById('openReviewModal').focus();
+  }
+
+  document.getElementById('openReviewModal').addEventListener('click', openModal);
+  document.getElementById('closeReviewModal').addEventListener('click', closeModal);
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.classList.remove('open');
+    if (e.target === overlay) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+  });
+
+  // Keep Tab focus cycling within the modal only, while it's open.
+  modalPanel.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const focusable = modalPanel.querySelectorAll('button, input, textarea, a[href]');
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
   });
 
   document.getElementById('submitReview').addEventListener('click', () => {
