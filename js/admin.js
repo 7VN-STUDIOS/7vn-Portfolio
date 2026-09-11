@@ -290,7 +290,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('addWorkBtn').addEventListener('click', saveWork);
   document.getElementById('cancelEditBtn').addEventListener('click', cancelEdit);
 
-  document.getElementById('disconnectBtn').addEventListener('click', () => {
+  document.getElementById('disconnectBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    const confirmed = confirm('Disconnect this browser from GitHub? You\'ll need your token again to reconnect.');
+    if (!confirmed) return;
     localStorage.removeItem(GH_KEY);
     ghConfig = null;
     showSetup();

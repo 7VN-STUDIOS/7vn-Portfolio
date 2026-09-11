@@ -58,7 +58,6 @@
     <div id="adminDashboard" style="display:none;">
       <div class="page-header" style="padding-top:60px;">
         <h1 class="page-title" style="font-size:2.2rem;">Manage works</h1>
-        <button class="btn btn-outline btn-small" id="disconnectBtn">Disconnect</button>
       </div>
 
       <section class="reel-section" style="padding-top:48px;">
@@ -95,6 +94,10 @@
           <tbody id="worksTableBody"></tbody>
         </table>
         <p class="status-msg" id="tableStatus"></p>
+
+        <div style="margin-top:64px; padding-top:24px; border-top:1px solid var(--border);">
+          <a href="#" id="disconnectBtn" style="color:var(--muted); font-size:0.85rem;">Disconnect this browser from GitHub</a>
+        </div>
       </section>
     </div>
 
