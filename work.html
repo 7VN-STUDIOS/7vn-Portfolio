@@ -70,9 +70,11 @@ async function init() {
   if (items.length === 0) {
     grid.innerHTML = `<p style="color:var(--muted);">No pieces added yet. Check back soon.</p>`;
   } else {
+    const thumbCache = {};
+
     function facadeInner(w, ytId) {
-      return `<img src="https://img.youtube.com/vi/${ytId}/maxresdefault.jpg" alt="${w.title}" loading="lazy"
-             onerror="this.onerror=null; this.src='https://img.youtube.com/vi/${ytId}/sddefault.jpg'; this.onerror=function(){this.onerror=null; this.src='https://img.youtube.com/vi/${ytId}/hqdefault.jpg';};">
+      const src = thumbCache[ytId] || `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+      return `<img src="${src}" alt="${w.title}" loading="lazy" data-yt-id="${ytId}" class="yt-thumb-img">
         <button class="play-btn" aria-label="Play ${w.title}">
           <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         </button>`;
@@ -119,6 +121,25 @@ async function init() {
         facade.innerHTML = playerInner(url);
         facade.classList.add('playing');
       });
+    });
+
+    // The static img.youtube.com URLs are sometimes a stale/auto-picked frame
+    // instead of the real thumbnail. Fetch the actual current one from
+    // YouTube's own oEmbed data and swap it in once it loads.
+    grid.querySelectorAll('.yt-thumb-img').forEach(async img => {
+      const ytId = img.getAttribute('data-yt-id');
+      try {
+        const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.thumbnail_url) {
+            thumbCache[ytId] = data.thumbnail_url;
+            img.src = data.thumbnail_url;
+          }
+        }
+      } catch (e) {
+        // Network/CORS issue: keep the fallback img.youtube.com thumbnail already showing.
+      }
     });
   }
 
