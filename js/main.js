@@ -26,6 +26,13 @@ function renderHeader(active) {
     const isOpen = navEl.classList.toggle('open');
     toggle.setAttribute('aria-expanded', String(isOpen));
   });
+
+  navEl.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      navEl.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    });
+  });
 }
 
 function renderFooter() {
