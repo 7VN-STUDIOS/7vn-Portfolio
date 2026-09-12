@@ -5,7 +5,7 @@ const GH_KEY = '7vn_admin_gh_config';
 const WORKS_PATH = 'data/works.json';
 const CONFIG_PATH = 'data/config.json';
 const REVIEWS_PATH = 'data/reviews.json';
-const REVIEWS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzXg30Y6vXERrkT2q3yxWHdBgyhp_HIS1bh1ZOGEEPL6jvUkqN05_6GI5rr3V4-p7vG/exec';
+const REVIEWS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyD6hwncVlCxB-yXAJXrWZt1ozakaMKRij9JnCwiQBB2RL6yhJmyByYN_4_m5WQTzBX/exec';
 const REVIEWS_SECRET = 'Eminent';
 
 let ghConfig = null;   // { owner, repo, branch, token }
