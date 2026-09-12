@@ -189,11 +189,15 @@ async function init() {
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Something went wrong.');
 
-      setStatus(status, 'Thank you! Your review has been sent for approval.', 'success');
+      if (data.emailError) {
+        setStatus(status, 'Review saved, but the email notification failed: ' + data.emailError, 'error');
+      } else {
+        setStatus(status, 'Thank you! Your review has been sent for approval.', 'success');
+      }
       document.getElementById('reviewName').value = '';
       document.getElementById('reviewRole').value = '';
       document.getElementById('reviewText').value = '';
-      setTimeout(closeModal, 1800);
+      if (!data.emailError) setTimeout(closeModal, 1800);
     } catch (e) {
       setStatus(status, 'Could not send right now. Please try again shortly.', 'error');
     }
