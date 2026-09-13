@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Admin | 7VN Studios</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Admin | 7VN Studios">
+<meta property="og:description" content="7VN Studios site admin.">
+<meta property="og:image" content="https://7vn-studios.github.io/7vn-Portfolio/assets/og-image.png">
+<meta property="og:url" content="https://7vn-studios.github.io/7vn-Portfolio/sagest.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Admin | 7VN Studios">
+<meta name="twitter:description" content="7VN Studios site admin.">
+<meta name="twitter:image" content="https://7vn-studios.github.io/7vn-Portfolio/assets/og-image.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
+<link rel="shortcut icon" href="assets/favicon.ico">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="passcodeGate" class="modal-overlay open" style="z-index:200;">
+  <div class="modal-panel" style="max-width:360px; text-align:center;">
+    <h3 style="font-family:var(--serif); font-size:1.3rem; margin-bottom:20px;">Enter passcode</h3>
+    <div class="form-field" style="text-align:left;">
+      <input id="passcodeInput" type="password" inputmode="numeric" placeholder="••••" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" id="passcodeSubmit" style="width:100%; justify-content:center;">Unlock</button>
+    <p class="status-msg" id="passcodeStatus"></p>
+  </div>
+</div>
+
+<header id="site-header" class="site-header" inert></header>
+
+<main id="mainContent" inert>
+
+  <div class="wrap">
+
+    <!-- Setup screen: shown until GitHub connection is configured -->
+    <div class="admin-lock" id="setupScreen">
+      <h1 class="page-title" style="font-size:2rem;">Connect to GitHub</h1>
+      <p style="color:var(--muted); margin-bottom:28px;">
+        This form saves directly to your GitHub repo, which redeploys your live site automatically.
+        You only need to do this setup once per browser.
+      </p>
+      <div class="form-field" style="text-align:left;">
+        <label for="ghOwner">GitHub username</label>
+        <input id="ghOwner" type="text" placeholder="e.g. sageFolayan">
+      </div>
+      <div class="form-field" style="text-align:left;">
+        <label for="ghRepo">Repository name</label>
+        <input id="ghRepo" type="text" placeholder="e.g. 7vn-portfolio">
+      </div>
+      <div class="form-field" style="text-align:left;">
+        <label for="ghBranch">Branch</label>
+        <input id="ghBranch" type="text" placeholder="main" value="main">
+      </div>
+      <div class="form-field" style="text-align:left;">
+        <label for="ghToken">Personal access token</label>
+        <input id="ghToken" type="password" placeholder="github_pat_...">
+      </div>
+      <button class="btn btn-primary" id="connectBtn" style="width:100%; justify-content:center;">Connect</button>
+      <p class="status-msg" id="setupStatus"></p>
+    </div>
+
+    <!-- Admin dashboard: shown once connected -->
+    <div id="adminDashboard" style="display:none;">
+      <div class="page-header" style="padding-top:60px;">
+        <h1 class="page-title" style="font-size:2.2rem;">Manage works</h1>
+      </div>
+
+      <section class="reel-section" style="padding-top:48px;">
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;" id="formHeading">Add a new piece</h2>
+        <div class="form-field">
+          <label for="newCategory">Category</label>
+          <select id="newCategory"></select>
+        </div>
+        <div class="form-field">
+          <label for="newTitle">Title</label>
+          <input id="newTitle" type="text" placeholder="e.g. Adaeze's Wedding Highlight">
+        </div>
+        <div class="form-field">
+          <label for="newVideoUrl">Video link</label>
+          <input id="newVideoUrl" type="text" placeholder="Paste any YouTube or Vimeo link, and it will be converted automatically">
+        </div>
+        <div class="form-field">
+          <label for="newThumbnail">Thumbnail image URL (optional)</label>
+          <input id="newThumbnail" type="text" placeholder="Leave blank to use the YouTube thumbnail automatically">
+        </div>
+        <div class="form-field">
+          <label for="newDescription">Short description (optional)</label>
+          <input id="newDescription" type="text" placeholder="One line about the piece">
+        </div>
+        <button class="btn btn-primary" id="addWorkBtn">Add &amp; publish</button>
+        <button class="btn btn-outline btn-small" id="cancelEditBtn" style="display:none; margin-left:12px;">Cancel edit</button>
+        <p class="status-msg" id="addStatus"></p>
+
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin:48px 0 16px;">Existing works</h2>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Order</th><th>Category</th><th>Title</th><th></th></tr>
+          </thead>
+          <tbody id="worksTableBody"></tbody>
+        </table>
+        <p class="status-msg" id="tableStatus"></p>
+
+        <div style="margin-top:64px; padding-top:24px; border-top:1px solid var(--border);">
+          <a href="#" id="disconnectBtn" style="color:var(--muted); font-size:0.85rem;">Disconnect this browser from GitHub</a>
+        </div>
+      </section>
+
+      <section class="reel-section" style="padding-top:0;">
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;">Pending reviews</h2>
+        <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">Submitted from the site. Approve to publish instantly, or reject to dismiss.</p>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Name</th><th>Review</th><th></th></tr>
+          </thead>
+          <tbody id="pendingReviewsTableBody"></tbody>
+        </table>
+        <p class="status-msg" id="pendingReviewsStatus"></p>
+      </section>
+
+      <section class="reel-section" style="padding-top:0;">
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;" id="reviewFormHeading">Add a review</h2>
+        <div class="form-field">
+          <label for="newReviewName">Client name</label>
+          <input id="newReviewName" type="text" placeholder="e.g. Adaeze O.">
+        </div>
+        <div class="form-field">
+          <label for="newReviewRole">Role or company (optional)</label>
+          <input id="newReviewRole" type="text" placeholder="e.g. Bride, or Founder at [Brand]">
+        </div>
+        <div class="form-field">
+          <label for="newReviewText">Review text</label>
+          <textarea id="newReviewText" placeholder="What they said"></textarea>
+        </div>
+        <button class="btn btn-primary" id="addReviewBtn">Add &amp; publish</button>
+        <button class="btn btn-outline btn-small" id="cancelReviewEditBtn" style="display:none; margin-left:12px;">Cancel edit</button>
+        <p class="status-msg" id="reviewAddStatus"></p>
+
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin:48px 0 16px;">Existing reviews</h2>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Order</th><th>Name</th><th></th></tr>
+          </thead>
+          <tbody id="reviewsTableBody"></tbody>
+        </table>
+        <p class="status-msg" id="reviewTableStatus"></p>
+      </section>
+    </div>
+
+  </div>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script src="js/main.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

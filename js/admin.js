@@ -487,7 +487,16 @@ function showSetup() {
   document.getElementById('adminDashboard').style.display = 'none';
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+const PASSCODE = '7007';
+const PASSCODE_KEY = '7vn_admin_passcode_unlocked';
+
+function unlockGate() {
+  document.getElementById('passcodeGate').classList.remove('open');
+  document.getElementById('site-header').removeAttribute('inert');
+  document.getElementById('mainContent').removeAttribute('inert');
+}
+
+async function initAdminPage() {
   document.getElementById('connectBtn').addEventListener('click', async () => {
     const owner = document.getElementById('ghOwner').value.trim();
     const repo = document.getElementById('ghRepo').value.trim();
@@ -536,4 +545,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       setStatus(document.getElementById('setupStatus'), 'Saved connection failed. Please reconnect. ' + e.message, 'error');
     }
   }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem(PASSCODE_KEY) === 'true') {
+    unlockGate();
+    initAdminPage();
+    return;
+  }
+
+  document.getElementById('passcodeSubmit').addEventListener('click', () => {
+    const val = document.getElementById('passcodeInput').value.trim();
+    const status = document.getElementById('passcodeStatus');
+    if (val === PASSCODE) {
+      sessionStorage.setItem(PASSCODE_KEY, 'true');
+      unlockGate();
+      initAdminPage();
+    } else {
+      setStatus(status, 'Incorrect passcode.', 'error');
+      document.getElementById('passcodeInput').value = '';
+    }
+  });
+
+  document.getElementById('passcodeInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('passcodeSubmit').click();
+  });
 });
