@@ -1,19 +1,56 @@
 {
   "categories": [
-    { "slug": "events", "name": "Events", "driveUrl": "https://drive.google.com/PLACEHOLDER-EVENTS" },
-    { "slug": "youtube", "name": "YouTube", "driveUrl": "https://drive.google.com/PLACEHOLDER-YOUTUBE" },
-    { "slug": "reels", "name": "Reels", "driveUrl": "https://drive.google.com/PLACEHOLDER-REELS" },
-    { "slug": "motion-designs", "name": "Motion Designs", "driveUrl": "https://drive.google.com/PLACEHOLDER-MOTION" },
-    { "slug": "2d-animations", "name": "2D Animations", "driveUrl": "https://drive.google.com/PLACEHOLDER-2D" }
+    {
+      "slug": "events",
+      "name": "Events",
+      "driveUrl": "https://drive.google.com/drive/folders/1SDHgs-7vz_UaCIiIZiqpOFOdOn4P1aQT?usp=drive_link",
+      "thumbnail": ""
+    },
+    {
+      "slug": "youtube",
+      "name": "YouTube",
+      "driveUrl": "https://drive.google.com/PLACEHOLDER-YOUTUBE"
+    },
+    {
+      "slug": "reels",
+      "name": "Reels",
+      "driveUrl": "https://drive.google.com/PLACEHOLDER-REELS"
+    },
+    {
+      "slug": "motion-designs",
+      "name": "Motion Designs",
+      "driveUrl": "https://drive.google.com/PLACEHOLDER-MOTION"
+    },
+    {
+      "slug": "2d-animations",
+      "name": "2D Animations",
+      "driveUrl": "https://drive.google.com/PLACEHOLDER-2D"
+    }
   ],
   "contact": {
     "whatsapp": "https://wa.me/2348085660603",
     "email": "7vnstudios@gmail.com"
   },
   "services": [
-    { "name": "Event Coverage", "price": "Starting at ₦PLACEHOLDER", "description": "Full event video coverage, shot and edited." },
-    { "name": "Marketing Videos", "price": "Starting at ₦PLACEHOLDER", "description": "Brand and product videos built to convert." },
-    { "name": "Motion Design", "price": "Starting at ₦PLACEHOLDER", "description": "Animated motion graphics for brands." },
-    { "name": "Creator Editing", "price": "Starting at ₦PLACEHOLDER", "description": "Video editing for YouTube and social creators." }
+    {
+      "name": "Event Coverage",
+      "price": "Starting at ₦PLACEHOLDER",
+      "description": "Full event video coverage, shot and edited."
+    },
+    {
+      "name": "Marketing Videos",
+      "price": "Starting at ₦PLACEHOLDER",
+      "description": "Brand and product videos built to convert."
+    },
+    {
+      "name": "Motion Design",
+      "price": "Starting at ₦PLACEHOLDER",
+      "description": "Animated motion graphics for brands."
+    },
+    {
+      "name": "Creator Editing",
+      "price": "Starting at ₦PLACEHOLDER",
+      "description": "Video editing for YouTube and social creators."
+    }
   ]
 }
