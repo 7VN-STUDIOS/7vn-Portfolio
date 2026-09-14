@@ -106,6 +106,7 @@ async function init() {
       </div>
     </a>
   `).join('');
+  initScrollReveal('.category-card');
 
   const reviews = await loadJSON('data/reviews.json');
   const row = document.getElementById('reviewsRow');
@@ -120,6 +121,7 @@ async function init() {
       </div>
     `).join('');
   }
+  initScrollReveal('.review-card');
 
   const overlay = document.getElementById('reviewModalOverlay');
   const modalPanel = overlay.querySelector('.modal-panel');

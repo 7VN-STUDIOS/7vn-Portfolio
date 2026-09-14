@@ -64,6 +64,41 @@ function renderFooter() {
   `;
 }
 
+// Fades/rises elements into view as they scroll into the viewport.
+// Safe to call multiple times or on elements added after page load
+// (e.g. cards rendered from a fetch); already-tagged elements are skipped.
+function initScrollReveal(selector) {
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const els = document.querySelectorAll(selector);
+
+  els.forEach((el, i) => {
+    if (el.dataset.revealInit) return;
+    el.dataset.revealInit = 'true';
+    el.classList.add('reveal');
+
+    if (prefersReduced) {
+      el.classList.add('in-view');
+      return;
+    }
+    el.style.transitionDelay = `${Math.min(i * 60, 300)}ms`;
+  });
+
+  if (prefersReduced) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+
+  els.forEach(el => {
+    if (!el.classList.contains('in-view')) observer.observe(el);
+  });
+}
+
 async function loadJSON(path) {
   const res = await fetch(path, { cache: 'no-store' });
   if (!res.ok) throw new Error('Failed to load ' + path);
