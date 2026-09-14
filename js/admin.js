@@ -12,6 +12,9 @@ let ghConfig = null;   // { owner, repo, branch, token }
 let worksCache = [];   // current works.json content
 let worksSha = null;   // current file sha (needed to update)
 let categories = [];   // from config.json
+let configCache = null; // full config.json content
+let configSha = null;
+let editingCategorySlug = null;
 let editingId = null;  // id of the work currently being edited, or null when adding new
 
 let reviewsCache = [];
@@ -99,7 +102,9 @@ async function connect(owner, repo, branch, token) {
   const { content: works, sha } = await ghGetFile(WORKS_PATH);
   worksCache = works;
   worksSha = sha;
-  const { content: config } = await ghGetFile(CONFIG_PATH);
+  const { content: config, sha: configShaVal } = await ghGetFile(CONFIG_PATH);
+  configCache = config;
+  configSha = configShaVal;
   categories = config.categories || [];
   const { content: reviews, sha: reviewsShaVal } = await ghGetFile(REVIEWS_PATH);
   reviewsCache = reviews;
@@ -110,6 +115,126 @@ async function connect(owner, repo, branch, token) {
 function renderCategoryOptions() {
   const sel = document.getElementById('newCategory');
   sel.innerHTML = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+}
+
+function slugify(str) {
+  return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function renderCategoriesTable() {
+  const body = document.getElementById('categoriesTableBody');
+  if (categories.length === 0) {
+    body.innerHTML = `<tr><td colspan="4" style="color:var(--muted);">No categories yet.</td></tr>`;
+    return;
+  }
+  body.innerHTML = categories.map(c => `
+    <tr>
+      <td>${c.thumbnail ? `<img src="${c.thumbnail}" alt="${c.name}" style="width:48px; height:32px; object-fit:cover; display:block;">` : '<span style="color:var(--muted);">None</span>'}</td>
+      <td>${c.name}</td>
+      <td style="color:var(--muted); font-size:0.85rem;">${c.slug}</td>
+      <td>
+        <button class="btn btn-outline btn-small" data-cat-edit="${c.slug}">Edit</button>
+        <button class="btn btn-outline btn-small btn-danger" data-cat-delete="${c.slug}">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  body.querySelectorAll('button[data-cat-edit]').forEach(btn => {
+    btn.addEventListener('click', () => startCategoryEdit(btn.getAttribute('data-cat-edit')));
+  });
+  body.querySelectorAll('button[data-cat-delete]').forEach(btn => {
+    btn.addEventListener('click', () => deleteCategory(btn.getAttribute('data-cat-delete')));
+  });
+}
+
+function startCategoryEdit(slug) {
+  const cat = categories.find(c => c.slug === slug);
+  if (!cat) return;
+  editingCategorySlug = slug;
+
+  document.getElementById('newCatName').value = cat.name;
+  document.getElementById('newCatDrive').value = cat.driveUrl || '';
+  document.getElementById('newCatThumbnail').value = cat.thumbnail || '';
+
+  document.getElementById('categoryFormHeading').textContent = `Editing category: ${cat.name}`;
+  document.getElementById('addCategoryBtn').textContent = 'Save changes';
+  document.getElementById('cancelCategoryEditBtn').style.display = 'inline-flex';
+  document.getElementById('categoryFormHeading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelCategoryEdit() {
+  editingCategorySlug = null;
+  document.getElementById('newCatName').value = '';
+  document.getElementById('newCatDrive').value = '';
+  document.getElementById('newCatThumbnail').value = '';
+  document.getElementById('categoryFormHeading').textContent = 'Add a category';
+  document.getElementById('addCategoryBtn').textContent = 'Add & publish';
+  document.getElementById('cancelCategoryEditBtn').style.display = 'none';
+  setStatus(document.getElementById('categoryAddStatus'), '', '');
+}
+
+async function saveCategory() {
+  const status = document.getElementById('categoryAddStatus');
+  const name = document.getElementById('newCatName').value.trim();
+  const driveUrl = document.getElementById('newCatDrive').value.trim();
+  const thumbnail = document.getElementById('newCatThumbnail').value.trim();
+
+  if (!name) {
+    setStatus(status, 'Category name is required.', 'error');
+    return;
+  }
+
+  const isEditing = !!editingCategorySlug;
+  setStatus(status, isEditing ? 'Saving changes…' : 'Publishing…', '');
+  try {
+    if (isEditing) {
+      const idx = categories.findIndex(c => c.slug === editingCategorySlug);
+      if (idx === -1) throw new Error('Could not find that category anymore.');
+      categories[idx] = { ...categories[idx], name, driveUrl, thumbnail };
+    } else {
+      const slug = slugify(name);
+      if (categories.some(c => c.slug === slug)) {
+        throw new Error('A category with a very similar name already exists.');
+      }
+      categories = [...categories, { slug, name, driveUrl, thumbnail }];
+    }
+
+    configCache.categories = categories;
+    const result = await ghPutFile(CONFIG_PATH, configCache, configSha, isEditing ? `Edit category "${name}" via admin` : `Add category "${name}" via admin`);
+    configSha = result.content.sha;
+    renderCategoriesTable();
+    renderCategoryOptions();
+    cancelCategoryEdit();
+    setStatus(status, isEditing ? 'Changes saved and published. Live site updates in about a minute.' : 'Published! Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+async function deleteCategory(slug) {
+  const status = document.getElementById('categoryAddStatus');
+  const cat = categories.find(c => c.slug === slug);
+  if (!cat) return;
+
+  const worksInCategory = worksCache.filter(w => w.category === cat.name).length;
+  const warning = worksInCategory > 0
+    ? `Delete "${cat.name}"? ${worksInCategory} existing work(s) are tagged with this category and will no longer be reachable from the category grid (their data stays in works.json, but you'll want to move or remove them).`
+    : `Delete "${cat.name}"? This publishes immediately.`;
+  if (!confirm(warning)) return;
+
+  setStatus(status, 'Deleting…', '');
+  try {
+    categories = categories.filter(c => c.slug !== slug);
+    configCache.categories = categories;
+    const result = await ghPutFile(CONFIG_PATH, configCache, configSha, `Remove category "${cat.name}" via admin`);
+    configSha = result.content.sha;
+    renderCategoriesTable();
+    renderCategoryOptions();
+    if (editingCategorySlug === slug) cancelCategoryEdit();
+    setStatus(status, 'Deleted and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
 }
 
 function categoryIndices(category) {
@@ -477,6 +602,7 @@ function showDashboard() {
   document.getElementById('setupScreen').style.display = 'none';
   document.getElementById('adminDashboard').style.display = 'block';
   renderCategoryOptions();
+  renderCategoriesTable();
   renderWorksTable();
   renderReviewsTable();
   fetchPendingReviews();
@@ -522,6 +648,9 @@ async function initAdminPage() {
 
   document.getElementById('addReviewBtn').addEventListener('click', saveReview);
   document.getElementById('cancelReviewEditBtn').addEventListener('click', cancelReviewEdit);
+
+  document.getElementById('addCategoryBtn').addEventListener('click', saveCategory);
+  document.getElementById('cancelCategoryEditBtn').addEventListener('click', cancelCategoryEdit);
 
   document.getElementById('disconnectBtn').addEventListener('click', (e) => {
     e.preventDefault();

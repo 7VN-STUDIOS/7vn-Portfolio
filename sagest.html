@@ -69,7 +69,39 @@
     <!-- Admin dashboard: shown once connected -->
     <div id="adminDashboard" style="display:none;">
       <div class="page-header" style="padding-top:60px;">
-        <h1 class="page-title" style="font-size:2.2rem;">Manage works</h1>
+        <h1 class="page-title" style="font-size:2.2rem;">Manage categories</h1>
+      </div>
+
+      <section class="reel-section" style="padding-top:48px;">
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin-bottom:16px;" id="categoryFormHeading">Add a category</h2>
+        <div class="form-field">
+          <label for="newCatName">Category name</label>
+          <input id="newCatName" type="text" placeholder="e.g. Weddings">
+        </div>
+        <div class="form-field">
+          <label for="newCatDrive">Google Drive folder link (optional)</label>
+          <input id="newCatDrive" type="text" placeholder="Link shown as 'See more on Drive' for this category">
+        </div>
+        <div class="form-field">
+          <label for="newCatThumbnail">Thumbnail image URL (optional)</label>
+          <input id="newCatThumbnail" type="text" placeholder="Shown on the homepage category card">
+        </div>
+        <button class="btn btn-primary" id="addCategoryBtn">Add &amp; publish</button>
+        <button class="btn btn-outline btn-small" id="cancelCategoryEditBtn" style="display:none; margin-left:12px;">Cancel edit</button>
+        <p class="status-msg" id="categoryAddStatus"></p>
+
+        <h2 style="font-family:var(--serif); font-size:1.4rem; margin:48px 0 16px;">Existing categories</h2>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Thumbnail</th><th>Name</th><th>Slug</th><th></th></tr>
+          </thead>
+          <tbody id="categoriesTableBody"></tbody>
+        </table>
+        <p style="color:var(--muted); font-size:0.8rem; margin-top:12px;">Deleting a category doesn't delete its works, but they won't be reachable from the homepage grid until moved to another category.</p>
+      </section>
+
+      <div class="page-header" style="padding-top:0; border-top:1px solid var(--border); margin-top:64px;">
+        <h1 class="page-title" style="font-size:2.2rem; padding-top:48px;">Manage works</h1>
       </div>
 
       <section class="reel-section" style="padding-top:48px;">

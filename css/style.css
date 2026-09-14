@@ -242,6 +242,31 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 
 .category-card:hover { background: var(--maroon-deep); }
 
+.category-card.has-thumb {
+  background-size: cover;
+  background-position: center;
+}
+
+.category-card.has-thumb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(18,10,11,0.55) 0%, rgba(18,10,11,0.85) 100%);
+  transition: background 0.25s ease;
+}
+
+.category-card.has-thumb:hover::before {
+  background: linear-gradient(180deg, rgba(92,20,32,0.55) 0%, rgba(18,10,11,0.88) 100%);
+}
+
+.category-card.has-thumb:hover { background-color: var(--black); }
+
+.category-card .num,
+.category-card > div {
+  position: relative;
+  z-index: 1;
+}
+
 .category-card .num {
   font-family: var(--serif);
   color: var(--gold);
