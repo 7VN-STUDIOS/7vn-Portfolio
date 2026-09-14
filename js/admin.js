@@ -66,6 +66,26 @@ async function ghPutFile(path, content, sha, message) {
   return res.json();
 }
 
+// Uploads a new binary file (e.g. a cropped thumbnail) to the repo.
+// base64Content should NOT include the "data:image/...;base64," prefix.
+async function ghPutBinaryFile(path, base64Content, message) {
+  const body = {
+    message,
+    content: base64Content,
+    branch: ghConfig.branch,
+  };
+  const res = await fetch(`https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${path}`, {
+    method: 'PUT',
+    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Failed to upload ${path} (${res.status})`);
+  }
+  return res.json();
+}
+
 function normalizeVideoUrl(raw) {
   const url = raw.trim();
 
@@ -622,6 +642,83 @@ function unlockGate() {
   document.getElementById('mainContent').removeAttribute('inert');
 }
 
+let cropper = null;
+let cropTargetInputId = null;
+
+function openCropModal(file, targetInputId, aspect) {
+  cropTargetInputId = targetInputId;
+  const overlay = document.getElementById('cropModalOverlay');
+  const img = document.getElementById('cropperImage');
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    img.src = e.target.result;
+    overlay.classList.add('open');
+
+    if (cropper) cropper.destroy();
+    cropper = new Cropper(img, {
+      aspectRatio: aspect === '16/9' ? 16 / 9 : NaN,
+      viewMode: 1,
+      autoCropArea: 1,
+      background: false,
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function closeCropModal() {
+  document.getElementById('cropModalOverlay').classList.remove('open');
+  if (cropper) {
+    cropper.destroy();
+    cropper = null;
+  }
+  cropTargetInputId = null;
+  setStatus(document.getElementById('cropStatus'), '', '');
+}
+
+async function applyCrop() {
+  const status = document.getElementById('cropStatus');
+  if (!cropper || !cropTargetInputId) return;
+
+  setStatus(status, 'Uploading…', '');
+  try {
+    const canvas = cropper.getCroppedCanvas({ width: 1200, height: 675, imageSmoothingQuality: 'high' });
+    const base64 = await new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error('Could not process the image.')); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not read the cropped image.'));
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', 0.85);
+    });
+
+    const filename = `thumb-${Date.now()}.jpg`;
+    const path = `assets/uploads/${filename}`;
+    await ghPutBinaryFile(path, base64, `Upload thumbnail ${filename} via admin`);
+
+    document.getElementById(cropTargetInputId).value = path;
+    closeCropModal();
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+function initThumbnailUploads() {
+  document.querySelectorAll('input[type="file"][data-target]').forEach(fileInput => {
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      openCropModal(file, fileInput.getAttribute('data-target'), fileInput.getAttribute('data-aspect'));
+      fileInput.value = '';
+    });
+  });
+
+  document.getElementById('cropApplyBtn').addEventListener('click', applyCrop);
+  document.getElementById('cropCancelBtn').addEventListener('click', closeCropModal);
+  document.getElementById('cropModalClose').addEventListener('click', closeCropModal);
+}
+
 async function initAdminPage() {
   document.getElementById('connectBtn').addEventListener('click', async () => {
     const owner = document.getElementById('ghOwner').value.trim();
@@ -650,6 +747,7 @@ async function initAdminPage() {
   document.getElementById('cancelReviewEditBtn').addEventListener('click', cancelReviewEdit);
 
   document.getElementById('addCategoryBtn').addEventListener('click', saveCategory);
+  initThumbnailUploads();
   document.getElementById('cancelCategoryEditBtn').addEventListener('click', cancelCategoryEdit);
 
   document.getElementById('disconnectBtn').addEventListener('click', (e) => {

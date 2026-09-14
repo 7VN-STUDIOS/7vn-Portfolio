@@ -19,6 +19,8 @@
 <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon-180.png">
 <link rel="shortcut icon" href="assets/favicon.ico">
 <link rel="stylesheet" href="css/style.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </head>
 <body>
 
@@ -83,8 +85,9 @@
           <input id="newCatDrive" type="text" placeholder="Link shown as 'See more on Drive' for this category">
         </div>
         <div class="form-field">
-          <label for="newCatThumbnail">Thumbnail image URL (optional)</label>
-          <input id="newCatThumbnail" type="text" placeholder="Shown on the homepage category card">
+          <label for="newCatThumbnail">Thumbnail image</label>
+          <input id="newCatThumbnail" type="text" placeholder="Paste an image URL, or upload a file below">
+          <input id="newCatThumbnailFile" type="file" accept="image/*" style="margin-top:10px;" data-target="newCatThumbnail" data-aspect="16/9">
         </div>
         <button class="btn btn-primary" id="addCategoryBtn">Add &amp; publish</button>
         <button class="btn btn-outline btn-small" id="cancelCategoryEditBtn" style="display:none; margin-left:12px;">Cancel edit</button>
@@ -119,8 +122,9 @@
           <input id="newVideoUrl" type="text" placeholder="Paste any YouTube or Vimeo link, and it will be converted automatically">
         </div>
         <div class="form-field">
-          <label for="newThumbnail">Thumbnail image URL (optional)</label>
+          <label for="newThumbnail">Thumbnail image (optional)</label>
           <input id="newThumbnail" type="text" placeholder="Leave blank to use the YouTube thumbnail automatically">
+          <input id="newThumbnailFile" type="file" accept="image/*" style="margin-top:10px;" data-target="newThumbnail" data-aspect="16/9">
         </div>
         <div class="form-field">
           <label for="newDescription">Short description (optional)</label>
@@ -191,6 +195,21 @@
 <footer id="site-footer"></footer>
 
 <script src="js/main.js"></script>
+<div class="modal-overlay" id="cropModalOverlay">
+  <div class="modal-panel" style="max-width:560px;">
+    <button class="modal-close" id="cropModalClose" aria-label="Close">&times;</button>
+    <h3 style="font-family:var(--serif); font-size:1.3rem; margin-bottom:16px;">Crop thumbnail</h3>
+    <div style="max-height:60vh; overflow:hidden;">
+      <img id="cropperImage" style="max-width:100%; display:block;">
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button class="btn btn-primary" id="cropApplyBtn" style="flex:1; justify-content:center;">Use this crop</button>
+      <button class="btn btn-outline" id="cropCancelBtn">Cancel</button>
+    </div>
+    <p class="status-msg" id="cropStatus"></p>
+  </div>
+</div>
+
 <script src="js/admin.js"></script>
 </body>
 </html>
