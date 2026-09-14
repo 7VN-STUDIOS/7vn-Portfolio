@@ -278,11 +278,22 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 }
 
 .category-card.has-thumb {
-  background-size: cover;
-  background-position: center;
+  overflow: hidden;
 }
 
 .category-card.has-thumb::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  background-image: var(--thumb-url);
+  background-size: cover;
+  background-position: center;
+  filter: blur(6px);
+  transform: scale(1.08);
+  transition: filter 0.25s ease;
+}
+
+.category-card.has-thumb::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -290,11 +301,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   transition: background 0.25s ease;
 }
 
-.category-card.has-thumb:hover::before {
+.category-card.has-thumb:hover::after {
   background: linear-gradient(180deg, rgba(92,20,32,0.55) 0%, rgba(18,10,11,0.88) 100%);
 }
-
-.category-card.has-thumb:hover { background-color: var(--black); }
 
 .category-card .num,
 .category-card > div {

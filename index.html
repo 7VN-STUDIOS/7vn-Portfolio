@@ -97,7 +97,7 @@ async function init() {
   const config = await loadJSON('data/config.json');
   const grid = document.getElementById('categoryGrid');
   grid.innerHTML = config.categories.map((c, i) => `
-    <a class="category-card${c.thumbnail ? ' has-thumb' : ''}" href="work.html?category=${c.slug}" ${c.thumbnail ? `style="background-image: url('${c.thumbnail}');"` : ''}>
+    <a class="category-card${c.thumbnail ? ' has-thumb' : ''}" href="work.html?category=${c.slug}" ${c.thumbnail ? `style="--thumb-url: url('${c.thumbnail}');"` : ''}>
       <span class="num">0${i + 1}</span>
       <div>
         <h3>${c.name}</h3>
