@@ -88,6 +88,10 @@
           <label for="newCatThumbnail">Thumbnail image</label>
           <input id="newCatThumbnail" type="text" placeholder="Paste an image URL, or upload a file below">
           <input id="newCatThumbnailFile" type="file" accept="image/*" style="margin-top:10px;" data-target="newCatThumbnail" data-aspect="16/9">
+          <div id="newCatThumbnailPreviewWrap" style="display:none; margin-top:12px;">
+            <img id="newCatThumbnailPreview" style="width:160px; height:90px; object-fit:cover; border:1px solid var(--border); display:block;">
+            <p id="newCatThumbnailPreviewStatus" style="font-size:0.78rem; color:var(--muted); margin-top:6px;"></p>
+          </div>
         </div>
         <button class="btn btn-primary" id="addCategoryBtn">Add &amp; publish</button>
         <button class="btn btn-outline btn-small" id="cancelCategoryEditBtn" style="display:none; margin-left:12px;">Cancel edit</button>
@@ -125,6 +129,10 @@
           <label for="newThumbnail">Thumbnail image (optional)</label>
           <input id="newThumbnail" type="text" placeholder="Leave blank to use the YouTube thumbnail automatically">
           <input id="newThumbnailFile" type="file" accept="image/*" style="margin-top:10px;" data-target="newThumbnail" data-aspect="16/9">
+          <div id="newThumbnailPreviewWrap" style="display:none; margin-top:12px;">
+            <img id="newThumbnailPreview" style="width:160px; height:90px; object-fit:cover; border:1px solid var(--border); display:block;">
+            <p id="newThumbnailPreviewStatus" style="font-size:0.78rem; color:var(--muted); margin-top:6px;"></p>
+          </div>
         </div>
         <div class="form-field">
           <label for="newDescription">Short description (optional)</label>

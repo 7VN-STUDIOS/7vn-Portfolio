@@ -175,6 +175,7 @@ function startCategoryEdit(slug) {
   document.getElementById('newCatName').value = cat.name;
   document.getElementById('newCatDrive').value = cat.driveUrl || '';
   document.getElementById('newCatThumbnail').value = cat.thumbnail || '';
+  updateThumbPreview('newCatThumbnail');
 
   document.getElementById('categoryFormHeading').textContent = `Editing category: ${cat.name}`;
   document.getElementById('addCategoryBtn').textContent = 'Save changes';
@@ -187,6 +188,7 @@ function cancelCategoryEdit() {
   document.getElementById('newCatName').value = '';
   document.getElementById('newCatDrive').value = '';
   document.getElementById('newCatThumbnail').value = '';
+  updateThumbPreview('newCatThumbnail');
   document.getElementById('categoryFormHeading').textContent = 'Add a category';
   document.getElementById('addCategoryBtn').textContent = 'Add & publish';
   document.getElementById('cancelCategoryEditBtn').style.display = 'none';
@@ -351,6 +353,7 @@ function startEdit(id) {
   document.getElementById('newTitle').value = work.title;
   document.getElementById('newVideoUrl').value = work.videoUrl;
   document.getElementById('newThumbnail').value = work.thumbnail || '';
+  updateThumbPreview('newThumbnail');
   document.getElementById('newDescription').value = work.description || '';
 
   document.getElementById('formHeading').textContent = `Editing: ${work.title}`;
@@ -365,6 +368,7 @@ function cancelEdit() {
   document.getElementById('newTitle').value = '';
   document.getElementById('newVideoUrl').value = '';
   document.getElementById('newThumbnail').value = '';
+  updateThumbPreview('newThumbnail');
   document.getElementById('newDescription').value = '';
   document.getElementById('formHeading').textContent = 'Add a new piece';
   document.getElementById('addWorkBtn').textContent = 'Add & publish';
@@ -645,7 +649,15 @@ function unlockGate() {
 let cropper = null;
 let cropTargetInputId = null;
 
+const MAX_SOURCE_FILE_MB = 15;
+const MAX_UPLOAD_BYTES = 950000; // GitHub's Contents API caps files at ~1MB; stay safely under that
+
 function openCropModal(file, targetInputId, aspect) {
+  if (file.size > MAX_SOURCE_FILE_MB * 1024 * 1024) {
+    alert(`That file is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Please choose an image under ${MAX_SOURCE_FILE_MB}MB.`);
+    return;
+  }
+
   cropTargetInputId = targetInputId;
   const overlay = document.getElementById('cropModalOverlay');
   const img = document.getElementById('cropperImage');
@@ -680,28 +692,69 @@ async function applyCrop() {
   const status = document.getElementById('cropStatus');
   if (!cropper || !cropTargetInputId) return;
 
-  setStatus(status, 'Uploading…', '');
+  setStatus(status, 'Processing…', '');
   try {
     const canvas = cropper.getCroppedCanvas({ width: 1200, height: 675, imageSmoothingQuality: 'high' });
-    const base64 = await new Promise((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) { reject(new Error('Could not process the image.')); return; }
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = () => reject(new Error('Could not read the cropped image.'));
-        reader.readAsDataURL(blob);
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (!b) { reject(new Error('Could not process the image.')); return; }
+        resolve(b);
       }, 'image/jpeg', 0.85);
     });
 
+    if (blob.size > MAX_UPLOAD_BYTES) {
+      throw new Error(`Cropped image is too large (${(blob.size / 1024).toFixed(0)}KB, limit is ${(MAX_UPLOAD_BYTES / 1024).toFixed(0)}KB). Try cropping a smaller area, or start from a simpler/smaller source image.`);
+    }
+
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = () => reject(new Error('Could not read the cropped image.'));
+      reader.readAsDataURL(blob);
+    });
+
+    setStatus(status, 'Uploading…', '');
     const filename = `thumb-${Date.now()}.jpg`;
     const path = `assets/uploads/${filename}`;
-    await ghPutBinaryFile(path, base64, `Upload thumbnail ${filename} via admin`);
+    const result = await ghPutBinaryFile(path, base64, `Upload thumbnail ${filename} via admin`);
+
+    if (!result || !result.content || !result.content.path) {
+      throw new Error('Upload did not return a confirmed file path. Please try again.');
+    }
 
     document.getElementById(cropTargetInputId).value = path;
+    updateThumbPreview(cropTargetInputId);
     closeCropModal();
   } catch (e) {
     setStatus(status, e.message, 'error');
   }
+}
+
+function updateThumbPreview(inputId) {
+  const value = document.getElementById(inputId).value.trim();
+  const wrap = document.getElementById(`${inputId}PreviewWrap`);
+  const img = document.getElementById(`${inputId}Preview`);
+  const statusEl = document.getElementById(`${inputId}PreviewStatus`);
+  if (!wrap || !img || !statusEl) return;
+
+  if (!value) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  statusEl.textContent = 'Loading preview…';
+  statusEl.style.color = 'var(--muted)';
+  img.src = value;
+
+  img.onload = () => {
+    statusEl.textContent = 'Image loads correctly.';
+    statusEl.style.color = '#7fbf7f';
+  };
+  img.onerror = () => {
+    statusEl.textContent = 'This image could not be loaded, check the path or try uploading again.';
+    statusEl.style.color = '#d4756b';
+  };
 }
 
 function initThumbnailUploads() {
@@ -717,6 +770,12 @@ function initThumbnailUploads() {
   document.getElementById('cropApplyBtn').addEventListener('click', applyCrop);
   document.getElementById('cropCancelBtn').addEventListener('click', closeCropModal);
   document.getElementById('cropModalClose').addEventListener('click', closeCropModal);
+
+  ['newThumbnail', 'newCatThumbnail'].forEach(id => {
+    const input = document.getElementById(id);
+    input.addEventListener('input', () => updateThumbPreview(id));
+    updateThumbPreview(id);
+  });
 }
 
 async function initAdminPage() {
