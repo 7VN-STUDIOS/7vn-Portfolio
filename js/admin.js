@@ -730,7 +730,8 @@ async function applyCrop() {
   }
 }
 
-function updateThumbPreview(inputId) {
+function updateThumbPreview(inputId, attempt) {
+  attempt = attempt || 0;
   const value = document.getElementById(inputId).value.trim();
   const wrap = document.getElementById(`${inputId}PreviewWrap`);
   const img = document.getElementById(`${inputId}Preview`);
@@ -743,17 +744,23 @@ function updateThumbPreview(inputId) {
   }
 
   wrap.style.display = 'block';
-  statusEl.textContent = 'Loading preview…';
+  statusEl.textContent = attempt === 0 ? 'Loading preview…' : `Not live yet, retrying… (${attempt}/4)`;
   statusEl.style.color = 'var(--muted)';
-  img.src = value;
+  img.src = value + (value.includes('?') ? '&' : '?') + 'cachebust=' + Date.now();
 
   img.onload = () => {
     statusEl.textContent = 'Image loads correctly.';
     statusEl.style.color = '#7fbf7f';
   };
   img.onerror = () => {
-    statusEl.textContent = 'This image could not be loaded, check the path or try uploading again.';
-    statusEl.style.color = '#d4756b';
+    // A freshly uploaded file can take up to a minute for GitHub Pages to
+    // actually publish, so retry a few times before calling it broken.
+    if (attempt < 4) {
+      setTimeout(() => updateThumbPreview(inputId, attempt + 1), 8000);
+    } else {
+      statusEl.textContent = 'This image still hasn\'t loaded after a minute. If you just uploaded it, wait a bit and re-check by editing this entry; otherwise the path may be wrong.';
+      statusEl.style.color = '#d4756b';
+    }
   };
 }
 
