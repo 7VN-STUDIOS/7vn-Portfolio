@@ -68,22 +68,39 @@ async function ghPutFile(path, content, sha, message) {
 
 // Uploads a new binary file (e.g. a cropped thumbnail) to the repo.
 // base64Content should NOT include the "data:image/...;base64," prefix.
-async function ghPutBinaryFile(path, base64Content, message) {
+function ghPutBinaryFile(path, base64Content, message, onProgress) {
   const body = {
     message,
     content: base64Content,
     branch: ghConfig.branch,
   };
-  const res = await fetch(`https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${path}`, {
-    method: 'PUT',
-    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${path}`);
+    xhr.setRequestHeader('Authorization', `Bearer ${ghConfig.token}`);
+    xhr.setRequestHeader('Accept', 'application/vnd.github+json');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
+
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch (e) { /* ignore */ }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        reject(new Error(data.message || `Failed to upload ${path} (${xhr.status})`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error while uploading. Check your connection and try again.'));
+
+    xhr.send(JSON.stringify(body));
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `Failed to upload ${path} (${res.status})`);
-  }
-  return res.json();
 }
 
 function normalizeVideoUrl(raw) {
@@ -686,13 +703,18 @@ function closeCropModal() {
   }
   cropTargetInputId = null;
   setStatus(document.getElementById('cropStatus'), '', '');
+  document.getElementById('cropProgressWrap').style.display = 'none';
+  document.getElementById('cropProgressBar').style.width = '0%';
 }
 
 async function applyCrop() {
   const status = document.getElementById('cropStatus');
+  const progressWrap = document.getElementById('cropProgressWrap');
+  const progressBar = document.getElementById('cropProgressBar');
   if (!cropper || !cropTargetInputId) return;
 
-  setStatus(status, 'Processing…', '');
+  document.getElementById('cropApplyBtn').disabled = true;
+  setStatus(status, 'Compressing image…', '');
   try {
     const canvas = cropper.getCroppedCanvas({ width: 1200, height: 675, imageSmoothingQuality: 'high' });
     const blob = await new Promise((resolve, reject) => {
@@ -713,10 +735,16 @@ async function applyCrop() {
       reader.readAsDataURL(blob);
     });
 
-    setStatus(status, 'Uploading…', '');
+    setStatus(status, `Uploading… (${(blob.size / 1024).toFixed(0)}KB)`, '');
+    progressWrap.style.display = 'block';
+    progressBar.style.width = '0%';
+
     const filename = `thumb-${Date.now()}.jpg`;
     const path = `assets/uploads/${filename}`;
-    const result = await ghPutBinaryFile(path, base64, `Upload thumbnail ${filename} via admin`);
+    const result = await ghPutBinaryFile(path, base64, `Upload thumbnail ${filename} via admin`, (pct) => {
+      progressBar.style.width = pct + '%';
+      setStatus(status, `Uploading… ${pct}%`, '');
+    });
 
     if (!result || !result.content || !result.content.path) {
       throw new Error('Upload did not return a confirmed file path. Please try again.');
@@ -727,6 +755,9 @@ async function applyCrop() {
     closeCropModal();
   } catch (e) {
     setStatus(status, e.message, 'error');
+  } finally {
+    document.getElementById('cropApplyBtn').disabled = false;
+    progressWrap.style.display = 'none';
   }
 }
 
