@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title id="pageTitle">Work | 7VN Studios</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Work | 7VN Studios">
+<meta property="og:description" content="Selected work from 7VN Studios.">
+<meta property="og:image" content="https://7vnstudios.com.ng/assets/og-image.png">
+<meta property="og:url" content="https://7vnstudios.com.ng/work/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Work | 7VN Studios">
+<meta name="twitter:description" content="Selected work from 7VN Studios.">
+<meta name="twitter:image" content="https://7vnstudios.com.ng/assets/og-image.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/favicon-180.png">
+<link rel="shortcut icon" href="/assets/favicon.ico">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header id="site-header" class="site-header"></header>
+
+<main>
+  <section class="page-header">
+    <div class="wrap">
+      <h1 class="page-title" id="categoryTitle">Work</h1>
+      <p style="color:var(--muted);" id="categoryIntro"></p>
+    </div>
+  </section>
+
+  <section class="reel-section">
+    <div class="wrap">
+      <div class="work-grid" id="workGrid"></div>
+      <div class="more-cta" id="moreCta"></div>
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script src="/js/main.js"></script>
+<script>
+async function init() {
+  function getYouTubeId(url) {
+    const m = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{6,})/);
+    return m ? m[1] : null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get('category') || '';
+
+  const [config, works] = await Promise.all([
+    loadJSON('/data/config.json'),
+    loadJSON('/data/works.json'),
+  ]);
+
+  const cat = config.categories.find(c => c.slug === slug);
+  const catName = cat ? cat.name : 'Work';
+
+  document.title = `${catName} | 7VN Studios`;
+  document.getElementById('categoryTitle').textContent = catName;
+  document.getElementById('categoryIntro').textContent = `Selected ${catName.toLowerCase()} work.`;
+
+  const items = works.filter(w => w.category === catName).slice(0, 5);
+  const grid = document.getElementById('workGrid');
+
+  if (items.length === 0) {
+    grid.innerHTML = `<p style="color:var(--muted);">No pieces added yet. Check back soon.</p>`;
+  } else {
+    const thumbCache = {};
+
+    function facadeInner(w, ytId) {
+      const src = resolveAssetPath(w.thumbnail) || thumbCache[ytId] || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : '');
+      const trackAttr = (!w.thumbnail && ytId) ? `data-yt-id="${ytId}" class="yt-thumb-img"` : '';
+      return `<img src="${src}" alt="${w.title}" loading="lazy" ${trackAttr}>
+        <button class="play-btn" aria-label="Play ${w.title}">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>`;
+    }
+
+    function playerInner(url) {
+      const sep = url.includes('?') ? '&' : '?';
+      return `<iframe src="${url}${sep}autoplay=1&rel=0" title="Video" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    }
+
+    grid.innerHTML = items.map((w, i) => {
+      const ytId = getYouTubeId(w.videoUrl);
+      const canFacade = ytId || w.thumbnail;
+      const thumbHtml = canFacade
+        ? `<div class="thumb yt-facade" data-embed-url="${w.videoUrl}" data-index="${i}">${facadeInner(w, ytId)}</div>`
+        : `<div class="thumb"><iframe src="${w.videoUrl}" title="${w.title}" allowfullscreen loading="lazy"></iframe></div>`;
+
+      return `
+      <div class="work-card">
+        ${thumbHtml}
+        <div class="info">
+          <h3>${w.title}</h3>
+          <p>${w.description || ''}</p>
+        </div>
+      </div>
+    `;
+    }).join('');
+    initScrollReveal('.work-card');
+
+    // Click-to-play: swap the thumbnail facade for a real iframe, and stop
+    // any other video that's currently playing so only one plays at a time.
+    grid.querySelectorAll('.yt-facade').forEach(facade => {
+      facade.addEventListener('click', () => {
+        if (facade.classList.contains('playing')) return;
+
+        grid.querySelectorAll('.thumb.playing').forEach(playing => {
+          if (playing === facade) return;
+          const idx = playing.getAttribute('data-index');
+          const w = items[idx];
+          const ytId = getYouTubeId(w.videoUrl);
+          playing.innerHTML = facadeInner(w, ytId);
+          playing.classList.remove('playing');
+        });
+
+        const url = facade.getAttribute('data-embed-url');
+        facade.innerHTML = playerInner(url);
+        facade.classList.add('playing');
+      });
+    });
+
+    // The static img.youtube.com URLs are sometimes a stale/auto-picked frame
+    // instead of the real thumbnail. Fetch the actual current one from
+    // YouTube's own oEmbed data and swap it in once it loads.
+    grid.querySelectorAll('.yt-thumb-img').forEach(async img => {
+      const ytId = img.getAttribute('data-yt-id');
+      try {
+        const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.thumbnail_url) {
+            thumbCache[ytId] = data.thumbnail_url;
+            img.src = data.thumbnail_url;
+          }
+        }
+      } catch (e) {
+        // Network/CORS issue: keep the fallback img.youtube.com thumbnail already showing.
+      }
+    });
+  }
+
+  if (cat && cat.driveUrl) {
+    document.getElementById('moreCta').innerHTML = `
+      <a href="${cat.driveUrl}" target="_blank" rel="noopener" class="btn btn-outline">See more on Google Drive</a>
+    `;
+  }
+}
+init();
+</script>
+</body>
+</html>

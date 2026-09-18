@@ -1,0 +1,897 @@
+// Admin dashboard: reads/writes data/works.json directly to GitHub via the Contents API.
+// The token is stored ONLY in this browser's localStorage, never sent anywhere but api.github.com.
+
+const GH_KEY = '7vn_admin_gh_config';
+const WORKS_PATH = 'data/works.json';
+const CONFIG_PATH = 'data/config.json';
+const REVIEWS_PATH = 'data/reviews.json';
+const REVIEWS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyD6hwncVlCxB-yXAJXrWZt1ozakaMKRij9JnCwiQBB2RL6yhJmyByYN_4_m5WQTzBX/exec';
+const REVIEWS_SECRET = 'Eminent';
+
+let ghConfig = null;   // { owner, repo, branch, token }
+let worksCache = [];   // current works.json content
+let worksSha = null;   // current file sha (needed to update)
+let categories = [];   // from config.json
+let configCache = null; // full config.json content
+let configSha = null;
+let editingCategorySlug = null;
+let editingId = null;  // id of the work currently being edited, or null when adding new
+
+let reviewsCache = [];
+let reviewsSha = null;
+let editingReviewId = null;
+
+function b64EncodeUnicode(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function b64DecodeUnicode(str) {
+  return decodeURIComponent(escape(atob(str)));
+}
+
+function ghHeaders() {
+  return {
+    'Authorization': `Bearer ${ghConfig.token}`,
+    'Accept': 'application/vnd.github+json',
+  };
+}
+
+function ghUrl(path) {
+  return `https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${path}?ref=${ghConfig.branch}`;
+}
+
+async function ghGetFile(path) {
+  const res = await fetch(ghUrl(path), { headers: ghHeaders() });
+  if (!res.ok) throw new Error(`Could not read ${path} (${res.status}). Check repo name, branch and token permissions.`);
+  const data = await res.json();
+  const content = JSON.parse(b64DecodeUnicode(data.content));
+  return { content, sha: data.sha };
+}
+
+async function ghPutFile(path, content, sha, message) {
+  const body = {
+    message,
+    content: b64EncodeUnicode(JSON.stringify(content, null, 2)),
+    sha,
+    branch: ghConfig.branch,
+  };
+  const res = await fetch(`https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${path}`, {
+    method: 'PUT',
+    headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Failed to save ${path} (${res.status})`);
+  }
+  return res.json();
+}
+
+// Uploads a new binary file (e.g. a cropped thumbnail) to the repo.
+// base64Content should NOT include the "data:image/...;base64," prefix.
+function ghPutBinaryFile(path, base64Content, message, onProgress) {
+  const body = {
+    message,
+    content: base64Content,
+    branch: ghConfig.branch,
+  };
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `https://api.github.com/repos/${ghConfig.owner}/${ghConfig.repo}/contents/${path}`);
+    xhr.setRequestHeader('Authorization', `Bearer ${ghConfig.token}`);
+    xhr.setRequestHeader('Accept', 'application/vnd.github+json');
+    xhr.setRequestHeader('Content-Type', 'application/json');
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+    }
+
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch (e) { /* ignore */ }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        reject(new Error(data.message || `Failed to upload ${path} (${xhr.status})`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error while uploading. Check your connection and try again.'));
+
+    xhr.send(JSON.stringify(body));
+  });
+}
+
+function normalizeVideoUrl(raw) {
+  const url = raw.trim();
+
+  // Already a proper embed URL, leave it alone.
+  if (/youtube\.com\/embed\//.test(url) || /player\.vimeo\.com\/video\//.test(url)) {
+    return url;
+  }
+
+  // YouTube: watch?v=, youtu.be/, m.youtube.com, shorts/
+  let m = url.match(/(?:youtube\.com|m\.youtube\.com)\/watch\?v=([a-zA-Z0-9_-]{6,})/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+
+  m = url.match(/youtu\.be\/([a-zA-Z0-9_-]{6,})/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+
+  m = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{6,})/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+
+  // Vimeo: vimeo.com/123456789
+  m = url.match(/vimeo\.com\/(\d+)/);
+  if (m) return `https://player.vimeo.com/video/${m[1]}`;
+
+  // Unrecognized format, return as-is; the site will try it directly.
+  return url;
+}
+
+function setStatus(el, msg, type) {
+  el.textContent = msg;
+  el.className = 'status-msg' + (type ? ' ' + type : '');
+}
+
+async function connect(owner, repo, branch, token) {
+  ghConfig = { owner, repo, branch: branch || 'main', token };
+  const { content: works, sha } = await ghGetFile(WORKS_PATH);
+  worksCache = works;
+  worksSha = sha;
+  const { content: config, sha: configShaVal } = await ghGetFile(CONFIG_PATH);
+  configCache = config;
+  configSha = configShaVal;
+  categories = config.categories || [];
+  const { content: reviews, sha: reviewsShaVal } = await ghGetFile(REVIEWS_PATH);
+  reviewsCache = reviews;
+  reviewsSha = reviewsShaVal;
+  localStorage.setItem(GH_KEY, JSON.stringify(ghConfig));
+}
+
+function renderCategoryOptions() {
+  const sel = document.getElementById('newCategory');
+  sel.innerHTML = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+}
+
+function slugify(str) {
+  return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function renderCategoriesTable() {
+  const body = document.getElementById('categoriesTableBody');
+  if (categories.length === 0) {
+    body.innerHTML = `<tr><td colspan="4" style="color:var(--muted);">No categories yet.</td></tr>`;
+    return;
+  }
+  body.innerHTML = categories.map(c => `
+    <tr>
+      <td>${c.thumbnail ? `<img src="${resolveAssetPath(c.thumbnail)}" alt="${c.name}" style="width:48px; height:32px; object-fit:cover; display:block;">` : '<span style="color:var(--muted);">None</span>'}</td>
+      <td>${c.name}</td>
+      <td style="color:var(--muted); font-size:0.85rem;">${c.slug}</td>
+      <td>
+        <button class="btn btn-outline btn-small" data-cat-edit="${c.slug}">Edit</button>
+        <button class="btn btn-outline btn-small btn-danger" data-cat-delete="${c.slug}">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  body.querySelectorAll('button[data-cat-edit]').forEach(btn => {
+    btn.addEventListener('click', () => startCategoryEdit(btn.getAttribute('data-cat-edit')));
+  });
+  body.querySelectorAll('button[data-cat-delete]').forEach(btn => {
+    btn.addEventListener('click', () => deleteCategory(btn.getAttribute('data-cat-delete')));
+  });
+}
+
+function startCategoryEdit(slug) {
+  const cat = categories.find(c => c.slug === slug);
+  if (!cat) return;
+  editingCategorySlug = slug;
+
+  document.getElementById('newCatName').value = cat.name;
+  document.getElementById('newCatDrive').value = cat.driveUrl || '';
+  document.getElementById('newCatThumbnail').value = cat.thumbnail || '';
+  updateThumbPreview('newCatThumbnail');
+
+  document.getElementById('categoryFormHeading').textContent = `Editing category: ${cat.name}`;
+  document.getElementById('addCategoryBtn').textContent = 'Save changes';
+  document.getElementById('cancelCategoryEditBtn').style.display = 'inline-flex';
+  document.getElementById('categoryFormHeading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelCategoryEdit() {
+  editingCategorySlug = null;
+  document.getElementById('newCatName').value = '';
+  document.getElementById('newCatDrive').value = '';
+  document.getElementById('newCatThumbnail').value = '';
+  updateThumbPreview('newCatThumbnail');
+  document.getElementById('categoryFormHeading').textContent = 'Add a category';
+  document.getElementById('addCategoryBtn').textContent = 'Add & publish';
+  document.getElementById('cancelCategoryEditBtn').style.display = 'none';
+  setStatus(document.getElementById('categoryAddStatus'), '', '');
+}
+
+async function saveCategory() {
+  const status = document.getElementById('categoryAddStatus');
+  const name = document.getElementById('newCatName').value.trim();
+  const driveUrl = document.getElementById('newCatDrive').value.trim();
+  const thumbnail = document.getElementById('newCatThumbnail').value.trim();
+
+  if (!name) {
+    setStatus(status, 'Category name is required.', 'error');
+    return;
+  }
+
+  const isEditing = !!editingCategorySlug;
+  setStatus(status, isEditing ? 'Saving changes…' : 'Publishing…', '');
+  try {
+    if (isEditing) {
+      const idx = categories.findIndex(c => c.slug === editingCategorySlug);
+      if (idx === -1) throw new Error('Could not find that category anymore.');
+      categories[idx] = { ...categories[idx], name, driveUrl, thumbnail };
+    } else {
+      const slug = slugify(name);
+      if (categories.some(c => c.slug === slug)) {
+        throw new Error('A category with a very similar name already exists.');
+      }
+      categories = [...categories, { slug, name, driveUrl, thumbnail }];
+    }
+
+    configCache.categories = categories;
+    const result = await ghPutFile(CONFIG_PATH, configCache, configSha, isEditing ? `Edit category "${name}" via admin` : `Add category "${name}" via admin`);
+    configSha = result.content.sha;
+    renderCategoriesTable();
+    renderCategoryOptions();
+    cancelCategoryEdit();
+    setStatus(status, isEditing ? 'Changes saved and published. Live site updates in about a minute.' : 'Published! Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+async function deleteCategory(slug) {
+  const status = document.getElementById('categoryAddStatus');
+  const cat = categories.find(c => c.slug === slug);
+  if (!cat) return;
+
+  const worksInCategory = worksCache.filter(w => w.category === cat.name).length;
+  const warning = worksInCategory > 0
+    ? `Delete "${cat.name}"? ${worksInCategory} existing work(s) are tagged with this category and will no longer be reachable from the category grid (their data stays in works.json, but you'll want to move or remove them).`
+    : `Delete "${cat.name}"? This publishes immediately.`;
+  if (!confirm(warning)) return;
+
+  setStatus(status, 'Deleting…', '');
+  try {
+    categories = categories.filter(c => c.slug !== slug);
+    configCache.categories = categories;
+    const result = await ghPutFile(CONFIG_PATH, configCache, configSha, `Remove category "${cat.name}" via admin`);
+    configSha = result.content.sha;
+    renderCategoriesTable();
+    renderCategoryOptions();
+    if (editingCategorySlug === slug) cancelCategoryEdit();
+    setStatus(status, 'Deleted and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+function categoryIndices(category) {
+  const out = [];
+  worksCache.forEach((w, i) => { if (w.category === category) out.push(i); });
+  return out;
+}
+
+function renderWorksTable() {
+  const body = document.getElementById('worksTableBody');
+  if (worksCache.length === 0) {
+    body.innerHTML = `<tr><td colspan="4" style="color:var(--muted);">No works yet.</td></tr>`;
+    return;
+  }
+  body.innerHTML = worksCache.map((w) => {
+    const indices = categoryIndices(w.category);
+    const posInCategory = indices.indexOf(worksCache.indexOf(w));
+    const isFirst = posInCategory === 0;
+    const isLast = posInCategory === indices.length - 1;
+    return `
+    <tr>
+      <td>
+        <button class="btn btn-outline btn-small" data-move="up" data-id="${w.id}" ${isFirst ? 'disabled' : ''} aria-label="Move up">&uarr;</button>
+        <button class="btn btn-outline btn-small" data-move="down" data-id="${w.id}" ${isLast ? 'disabled' : ''} aria-label="Move down">&darr;</button>
+      </td>
+      <td>${w.category}</td>
+      <td>${w.title}</td>
+      <td>
+        <button class="btn btn-outline btn-small" data-edit="${w.id}">Edit</button>
+        <button class="btn btn-outline btn-small btn-danger" data-delete="${w.id}">Delete</button>
+      </td>
+    </tr>
+  `;
+  }).join('');
+
+  body.querySelectorAll('button[data-delete]').forEach(btn => {
+    btn.addEventListener('click', () => deleteWork(btn.getAttribute('data-delete')));
+  });
+  body.querySelectorAll('button[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => startEdit(btn.getAttribute('data-edit')));
+  });
+  body.querySelectorAll('button[data-move]').forEach(btn => {
+    btn.addEventListener('click', () => moveWork(btn.getAttribute('data-id'), btn.getAttribute('data-move')));
+  });
+}
+
+async function moveWork(id, direction) {
+  const tableStatus = document.getElementById('tableStatus');
+  const work = worksCache.find(w => w.id === id);
+  if (!work) return;
+
+  const indices = categoryIndices(work.category);
+  const pos = indices.indexOf(worksCache.indexOf(work));
+  const swapPos = direction === 'up' ? pos - 1 : pos + 1;
+  if (swapPos < 0 || swapPos >= indices.length) return;
+
+  const i = indices[pos];
+  const j = indices[swapPos];
+  [worksCache[i], worksCache[j]] = [worksCache[j], worksCache[i]];
+
+  setStatus(tableStatus, 'Reordering…', '');
+  try {
+    const result = await ghPutFile(WORKS_PATH, worksCache, worksSha, `Reorder works via admin`);
+    worksSha = result.content.sha;
+    renderWorksTable();
+    setStatus(tableStatus, 'Order updated and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(tableStatus, e.message, 'error');
+  }
+}
+
+async function deleteWork(id) {
+  const tableStatus = document.getElementById('tableStatus');
+  if (!confirm('Delete this piece? This publishes immediately.')) return;
+  setStatus(tableStatus, 'Deleting…', '');
+  try {
+    worksCache = worksCache.filter(w => w.id !== id);
+    const result = await ghPutFile(WORKS_PATH, worksCache, worksSha, `Remove work ${id} via admin`);
+    worksSha = result.content.sha;
+    if (editingId === id) cancelEdit();
+    renderWorksTable();
+    setStatus(tableStatus, 'Deleted and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(tableStatus, e.message, 'error');
+  }
+}
+
+function startEdit(id) {
+  const work = worksCache.find(w => w.id === id);
+  if (!work) return;
+  editingId = id;
+
+  document.getElementById('newCategory').value = work.category;
+  document.getElementById('newTitle').value = work.title;
+  document.getElementById('newVideoUrl').value = work.videoUrl;
+  document.getElementById('newThumbnail').value = work.thumbnail || '';
+  updateThumbPreview('newThumbnail');
+  document.getElementById('newDescription').value = work.description || '';
+
+  document.getElementById('formHeading').textContent = `Editing: ${work.title}`;
+  document.getElementById('addWorkBtn').textContent = 'Save changes';
+  document.getElementById('cancelEditBtn').style.display = 'inline-flex';
+
+  document.getElementById('formHeading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('newTitle').value = '';
+  document.getElementById('newVideoUrl').value = '';
+  document.getElementById('newThumbnail').value = '';
+  updateThumbPreview('newThumbnail');
+  document.getElementById('newDescription').value = '';
+  document.getElementById('formHeading').textContent = 'Add a new piece';
+  document.getElementById('addWorkBtn').textContent = 'Add & publish';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  setStatus(document.getElementById('addStatus'), '', '');
+}
+
+async function saveWork() {
+  const addStatus = document.getElementById('addStatus');
+  const category = document.getElementById('newCategory').value;
+  const title = document.getElementById('newTitle').value.trim();
+  const rawVideoUrl = document.getElementById('newVideoUrl').value.trim();
+  const thumbnail = document.getElementById('newThumbnail').value.trim();
+  const description = document.getElementById('newDescription').value.trim();
+
+  if (!title || !rawVideoUrl) {
+    setStatus(addStatus, 'Title and video URL are required.', 'error');
+    return;
+  }
+
+  const videoUrl = normalizeVideoUrl(rawVideoUrl);
+  const isEditing = !!editingId;
+
+  setStatus(addStatus, isEditing ? 'Saving changes…' : 'Publishing…', '');
+  try {
+    if (isEditing) {
+      const idx = worksCache.findIndex(w => w.id === editingId);
+      if (idx === -1) throw new Error('Could not find that work anymore. It may have been deleted elsewhere.');
+      worksCache[idx] = { ...worksCache[idx], category, title, videoUrl, thumbnail, description };
+    } else {
+      const id = `${category.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+      worksCache = [...worksCache, { id, category, title, videoUrl, thumbnail, description }];
+    }
+
+    const result = await ghPutFile(WORKS_PATH, worksCache, worksSha, isEditing ? `Edit work "${title}" via admin` : `Add work "${title}" via admin`);
+    worksSha = result.content.sha;
+    renderWorksTable();
+    cancelEdit();
+    setStatus(addStatus, isEditing ? 'Changes saved and published. Live site updates in about a minute.' : 'Published! Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(addStatus, e.message, 'error');
+  }
+}
+
+async function fetchPendingReviews() {
+  const status = document.getElementById('pendingReviewsStatus');
+  const body = document.getElementById('pendingReviewsTableBody');
+  setStatus(status, 'Loading…', '');
+  try {
+    const url = `${REVIEWS_ENDPOINT}?action=pending&key=${encodeURIComponent(REVIEWS_SECRET)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Could not load pending reviews.');
+
+    if (data.pending.length === 0) {
+      body.innerHTML = `<tr><td colspan="3" style="color:var(--muted);">No pending reviews right now.</td></tr>`;
+    } else {
+      body.innerHTML = data.pending.map(p => `
+        <tr>
+          <td>${p.name}${p.role ? ` <span style="color:var(--muted); font-size:0.8rem;">(${p.role})</span>` : ''}</td>
+          <td style="max-width:360px;">${p.text}</td>
+          <td>
+            <button class="btn btn-outline btn-small" data-approve="${p.rowId}" data-name="${p.name}" data-role="${p.role || ''}" data-text="${p.text.replace(/"/g, '&quot;')}">Approve</button>
+            <button class="btn btn-outline btn-small btn-danger" data-reject="${p.rowId}">Reject</button>
+          </td>
+        </tr>
+      `).join('');
+
+      body.querySelectorAll('button[data-approve]').forEach(btn => {
+        btn.addEventListener('click', () => approvePendingReview(
+          btn.getAttribute('data-approve'),
+          btn.getAttribute('data-name'),
+          btn.getAttribute('data-role'),
+          btn.getAttribute('data-text')
+        ));
+      });
+      body.querySelectorAll('button[data-reject]').forEach(btn => {
+        btn.addEventListener('click', () => rejectPendingReview(btn.getAttribute('data-reject')));
+      });
+    }
+    setStatus(status, '', '');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+async function callReviewsBackend(action, rowId) {
+  const res = await fetch(REVIEWS_ENDPOINT, {
+    method: 'POST',
+    body: JSON.stringify({ action, rowId, key: REVIEWS_SECRET }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Action failed.');
+}
+
+async function approvePendingReview(rowId, name, role, text) {
+  const status = document.getElementById('pendingReviewsStatus');
+  setStatus(status, 'Approving and publishing…', '');
+  try {
+    await callReviewsBackend('approve', rowId);
+
+    const id = `review-${Date.now()}`;
+    reviewsCache = [...reviewsCache, { id, name, role, text }];
+    const result = await ghPutFile(REVIEWS_PATH, reviewsCache, reviewsSha, `Approve review from ${name} via admin`);
+    reviewsSha = result.content.sha;
+    renderReviewsTable();
+
+    await fetchPendingReviews();
+    setStatus(status, 'Approved and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+async function rejectPendingReview(rowId) {
+  const status = document.getElementById('pendingReviewsStatus');
+  if (!confirm('Reject this review? It will be dismissed and won\'t show as pending again.')) return;
+  setStatus(status, 'Rejecting…', '');
+  try {
+    await callReviewsBackend('reject', rowId);
+    await fetchPendingReviews();
+    setStatus(status, 'Rejected.', 'success');
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  }
+}
+
+function renderReviewsTable() {
+  const body = document.getElementById('reviewsTableBody');
+  if (reviewsCache.length === 0) {
+    body.innerHTML = `<tr><td colspan="3" style="color:var(--muted);">No reviews yet.</td></tr>`;
+    return;
+  }
+  body.innerHTML = reviewsCache.map((r, i) => `
+    <tr>
+      <td>
+        <button class="btn btn-outline btn-small" data-review-move="up" data-review-id="${r.id}" ${i === 0 ? 'disabled' : ''} aria-label="Move up">&uarr;</button>
+        <button class="btn btn-outline btn-small" data-review-move="down" data-review-id="${r.id}" ${i === reviewsCache.length - 1 ? 'disabled' : ''} aria-label="Move down">&darr;</button>
+      </td>
+      <td>${r.name}</td>
+      <td>
+        <button class="btn btn-outline btn-small" data-review-edit="${r.id}">Edit</button>
+        <button class="btn btn-outline btn-small btn-danger" data-review-delete="${r.id}">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+
+  body.querySelectorAll('button[data-review-delete]').forEach(btn => {
+    btn.addEventListener('click', () => deleteReview(btn.getAttribute('data-review-delete')));
+  });
+  body.querySelectorAll('button[data-review-edit]').forEach(btn => {
+    btn.addEventListener('click', () => startReviewEdit(btn.getAttribute('data-review-edit')));
+  });
+  body.querySelectorAll('button[data-review-move]').forEach(btn => {
+    btn.addEventListener('click', () => moveReview(btn.getAttribute('data-review-id'), btn.getAttribute('data-review-move')));
+  });
+}
+
+async function moveReview(id, direction) {
+  const tableStatus = document.getElementById('reviewTableStatus');
+  const idx = reviewsCache.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= reviewsCache.length) return;
+
+  [reviewsCache[idx], reviewsCache[swapIdx]] = [reviewsCache[swapIdx], reviewsCache[idx]];
+
+  setStatus(tableStatus, 'Reordering…', '');
+  try {
+    const result = await ghPutFile(REVIEWS_PATH, reviewsCache, reviewsSha, 'Reorder reviews via admin');
+    reviewsSha = result.content.sha;
+    renderReviewsTable();
+    setStatus(tableStatus, 'Order updated and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(tableStatus, e.message, 'error');
+  }
+}
+
+async function deleteReview(id) {
+  const tableStatus = document.getElementById('reviewTableStatus');
+  if (!confirm('Delete this review? This publishes immediately.')) return;
+  setStatus(tableStatus, 'Deleting…', '');
+  try {
+    reviewsCache = reviewsCache.filter(r => r.id !== id);
+    const result = await ghPutFile(REVIEWS_PATH, reviewsCache, reviewsSha, `Remove review ${id} via admin`);
+    reviewsSha = result.content.sha;
+    if (editingReviewId === id) cancelReviewEdit();
+    renderReviewsTable();
+    setStatus(tableStatus, 'Deleted and published. Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(tableStatus, e.message, 'error');
+  }
+}
+
+function startReviewEdit(id) {
+  const review = reviewsCache.find(r => r.id === id);
+  if (!review) return;
+  editingReviewId = id;
+
+  document.getElementById('newReviewName').value = review.name;
+  document.getElementById('newReviewRole').value = review.role || '';
+  document.getElementById('newReviewText').value = review.text;
+
+  document.getElementById('reviewFormHeading').textContent = `Editing review: ${review.name}`;
+  document.getElementById('addReviewBtn').textContent = 'Save changes';
+  document.getElementById('cancelReviewEditBtn').style.display = 'inline-flex';
+  document.getElementById('reviewFormHeading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelReviewEdit() {
+  editingReviewId = null;
+  document.getElementById('newReviewName').value = '';
+  document.getElementById('newReviewRole').value = '';
+  document.getElementById('newReviewText').value = '';
+  document.getElementById('reviewFormHeading').textContent = 'Add a review';
+  document.getElementById('addReviewBtn').textContent = 'Add & publish';
+  document.getElementById('cancelReviewEditBtn').style.display = 'none';
+  setStatus(document.getElementById('reviewAddStatus'), '', '');
+}
+
+async function saveReview() {
+  const addStatus = document.getElementById('reviewAddStatus');
+  const name = document.getElementById('newReviewName').value.trim();
+  const role = document.getElementById('newReviewRole').value.trim();
+  const text = document.getElementById('newReviewText').value.trim();
+
+  if (!name || !text) {
+    setStatus(addStatus, 'Name and review text are required.', 'error');
+    return;
+  }
+
+  const isEditing = !!editingReviewId;
+  setStatus(addStatus, isEditing ? 'Saving changes…' : 'Publishing…', '');
+  try {
+    if (isEditing) {
+      const idx = reviewsCache.findIndex(r => r.id === editingReviewId);
+      if (idx === -1) throw new Error('Could not find that review anymore. It may have been deleted elsewhere.');
+      reviewsCache[idx] = { ...reviewsCache[idx], name, role, text };
+    } else {
+      const id = `review-${Date.now()}`;
+      reviewsCache = [...reviewsCache, { id, name, role, text }];
+    }
+
+    const result = await ghPutFile(REVIEWS_PATH, reviewsCache, reviewsSha, isEditing ? `Edit review "${name}" via admin` : `Add review "${name}" via admin`);
+    reviewsSha = result.content.sha;
+    renderReviewsTable();
+    cancelReviewEdit();
+    setStatus(addStatus, isEditing ? 'Changes saved and published. Live site updates in about a minute.' : 'Published! Live site updates in about a minute.', 'success');
+  } catch (e) {
+    setStatus(addStatus, e.message, 'error');
+  }
+}
+
+function showDashboard() {
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('adminDashboard').style.display = 'block';
+  renderCategoryOptions();
+  renderCategoriesTable();
+  renderWorksTable();
+  renderReviewsTable();
+  fetchPendingReviews();
+}
+
+function showSetup() {
+  document.getElementById('setupScreen').style.display = 'block';
+  document.getElementById('adminDashboard').style.display = 'none';
+}
+
+const PASSCODE = '7007';
+const PASSCODE_KEY = '7vn_admin_passcode_unlocked';
+
+function unlockGate() {
+  document.getElementById('passcodeGate').classList.remove('open');
+  document.getElementById('site-header').removeAttribute('inert');
+  document.getElementById('mainContent').removeAttribute('inert');
+}
+
+let cropper = null;
+let cropTargetInputId = null;
+
+const MAX_SOURCE_FILE_MB = 15;
+const MAX_UPLOAD_BYTES = 950000; // GitHub's Contents API caps files at ~1MB; stay safely under that
+
+function openCropModal(file, targetInputId, aspect) {
+  if (file.size > MAX_SOURCE_FILE_MB * 1024 * 1024) {
+    alert(`That file is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Please choose an image under ${MAX_SOURCE_FILE_MB}MB.`);
+    return;
+  }
+
+  cropTargetInputId = targetInputId;
+  const overlay = document.getElementById('cropModalOverlay');
+  const img = document.getElementById('cropperImage');
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    img.src = e.target.result;
+    overlay.classList.add('open');
+
+    if (cropper) cropper.destroy();
+    cropper = new Cropper(img, {
+      aspectRatio: aspect === '16/9' ? 16 / 9 : NaN,
+      viewMode: 1,
+      autoCropArea: 1,
+      background: false,
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function closeCropModal() {
+  document.getElementById('cropModalOverlay').classList.remove('open');
+  if (cropper) {
+    cropper.destroy();
+    cropper = null;
+  }
+  cropTargetInputId = null;
+  setStatus(document.getElementById('cropStatus'), '', '');
+  document.getElementById('cropProgressWrap').style.display = 'none';
+  document.getElementById('cropProgressBar').style.width = '0%';
+}
+
+async function applyCrop() {
+  const status = document.getElementById('cropStatus');
+  const progressWrap = document.getElementById('cropProgressWrap');
+  const progressBar = document.getElementById('cropProgressBar');
+  if (!cropper || !cropTargetInputId) return;
+
+  document.getElementById('cropApplyBtn').disabled = true;
+  setStatus(status, 'Compressing image…', '');
+  try {
+    const canvas = cropper.getCroppedCanvas({ width: 1200, height: 675, imageSmoothingQuality: 'high' });
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (!b) { reject(new Error('Could not process the image.')); return; }
+        resolve(b);
+      }, 'image/jpeg', 0.85);
+    });
+
+    if (blob.size > MAX_UPLOAD_BYTES) {
+      throw new Error(`Cropped image is too large (${(blob.size / 1024).toFixed(0)}KB, limit is ${(MAX_UPLOAD_BYTES / 1024).toFixed(0)}KB). Try cropping a smaller area, or start from a simpler/smaller source image.`);
+    }
+
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = () => reject(new Error('Could not read the cropped image.'));
+      reader.readAsDataURL(blob);
+    });
+
+    setStatus(status, `Uploading… (${(blob.size / 1024).toFixed(0)}KB)`, '');
+    progressWrap.style.display = 'block';
+    progressBar.style.width = '0%';
+
+    const filename = `thumb-${Date.now()}.jpg`;
+    const path = `assets/uploads/${filename}`;
+    const result = await ghPutBinaryFile(path, base64, `Upload thumbnail ${filename} via admin`, (pct) => {
+      progressBar.style.width = pct + '%';
+      setStatus(status, `Uploading… ${pct}%`, '');
+    });
+
+    if (!result || !result.content || !result.content.path) {
+      throw new Error('Upload did not return a confirmed file path. Please try again.');
+    }
+
+    document.getElementById(cropTargetInputId).value = path;
+    updateThumbPreview(cropTargetInputId);
+    closeCropModal();
+  } catch (e) {
+    setStatus(status, e.message, 'error');
+  } finally {
+    document.getElementById('cropApplyBtn').disabled = false;
+    progressWrap.style.display = 'none';
+  }
+}
+
+function updateThumbPreview(inputId, attempt) {
+  attempt = attempt || 0;
+  const value = document.getElementById(inputId).value.trim();
+  const wrap = document.getElementById(`${inputId}PreviewWrap`);
+  const img = document.getElementById(`${inputId}Preview`);
+  const statusEl = document.getElementById(`${inputId}PreviewStatus`);
+  if (!wrap || !img || !statusEl) return;
+
+  if (!value) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  statusEl.textContent = attempt === 0 ? 'Loading preview…' : `Not live yet, retrying… (${attempt}/4)`;
+  statusEl.style.color = 'var(--muted)';
+  img.src = resolveAssetPath(value) + (value.includes('?') ? '&' : '?') + 'cachebust=' + Date.now();
+
+  img.onload = () => {
+    statusEl.textContent = 'Image loads correctly.';
+    statusEl.style.color = '#7fbf7f';
+  };
+  img.onerror = () => {
+    // A freshly uploaded file can take up to a minute for GitHub Pages to
+    // actually publish, so retry a few times before calling it broken.
+    if (attempt < 4) {
+      setTimeout(() => updateThumbPreview(inputId, attempt + 1), 8000);
+    } else {
+      statusEl.textContent = 'This image still hasn\'t loaded after a minute. If you just uploaded it, wait a bit and re-check by editing this entry; otherwise the path may be wrong.';
+      statusEl.style.color = '#d4756b';
+    }
+  };
+}
+
+function initThumbnailUploads() {
+  document.querySelectorAll('input[type="file"][data-target]').forEach(fileInput => {
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      openCropModal(file, fileInput.getAttribute('data-target'), fileInput.getAttribute('data-aspect'));
+      fileInput.value = '';
+    });
+  });
+
+  document.getElementById('cropApplyBtn').addEventListener('click', applyCrop);
+  document.getElementById('cropCancelBtn').addEventListener('click', closeCropModal);
+  document.getElementById('cropModalClose').addEventListener('click', closeCropModal);
+
+  ['newThumbnail', 'newCatThumbnail'].forEach(id => {
+    const input = document.getElementById(id);
+    input.addEventListener('input', () => updateThumbPreview(id));
+    updateThumbPreview(id);
+  });
+}
+
+async function initAdminPage() {
+  document.getElementById('connectBtn').addEventListener('click', async () => {
+    const owner = document.getElementById('ghOwner').value.trim();
+    const repo = document.getElementById('ghRepo').value.trim();
+    const branch = document.getElementById('ghBranch').value.trim();
+    const token = document.getElementById('ghToken').value.trim();
+    const setupStatus = document.getElementById('setupStatus');
+
+    if (!owner || !repo || !token) {
+      setStatus(setupStatus, 'Fill in username, repo and token.', 'error');
+      return;
+    }
+    setStatus(setupStatus, 'Connecting…', '');
+    try {
+      await connect(owner, repo, branch, token);
+      showDashboard();
+    } catch (e) {
+      setStatus(setupStatus, e.message, 'error');
+    }
+  });
+
+  document.getElementById('addWorkBtn').addEventListener('click', saveWork);
+  document.getElementById('cancelEditBtn').addEventListener('click', cancelEdit);
+
+  document.getElementById('addReviewBtn').addEventListener('click', saveReview);
+  document.getElementById('cancelReviewEditBtn').addEventListener('click', cancelReviewEdit);
+
+  document.getElementById('addCategoryBtn').addEventListener('click', saveCategory);
+  initThumbnailUploads();
+  document.getElementById('cancelCategoryEditBtn').addEventListener('click', cancelCategoryEdit);
+
+  document.getElementById('disconnectBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    const confirmed = confirm('Disconnect this browser from GitHub? You\'ll need your token again to reconnect.');
+    if (!confirmed) return;
+    localStorage.removeItem(GH_KEY);
+    ghConfig = null;
+    showSetup();
+  });
+
+  // Auto-connect if a saved config exists
+  const saved = localStorage.getItem(GH_KEY);
+  if (saved) {
+    try {
+      const cfg = JSON.parse(saved);
+      document.getElementById('setupStatus').textContent = 'Reconnecting…';
+      await connect(cfg.owner, cfg.repo, cfg.branch, cfg.token);
+      showDashboard();
+    } catch (e) {
+      showSetup();
+      setStatus(document.getElementById('setupStatus'), 'Saved connection failed. Please reconnect. ' + e.message, 'error');
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem(PASSCODE_KEY) === 'true') {
+    unlockGate();
+    initAdminPage();
+    return;
+  }
+
+  document.getElementById('passcodeSubmit').addEventListener('click', () => {
+    const val = document.getElementById('passcodeInput').value.trim();
+    const status = document.getElementById('passcodeStatus');
+    if (val === PASSCODE) {
+      sessionStorage.setItem(PASSCODE_KEY, 'true');
+      unlockGate();
+      initAdminPage();
+    } else {
+      setStatus(status, 'Incorrect passcode.', 'error');
+      document.getElementById('passcodeInput').value = '';
+    }
+  });
+
+  document.getElementById('passcodeInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('passcodeSubmit').click();
+  });
+});
