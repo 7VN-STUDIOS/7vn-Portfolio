@@ -1,2 +1,4 @@
 User-agent: *
 Disallow: /sagest/
+
+Sitemap: https://7vnstudios.com.ng/sitemap.xml
