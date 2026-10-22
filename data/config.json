@@ -29,6 +29,12 @@
       "name": "Weddings",
       "driveUrl": "",
       "thumbnail": ""
+    },
+    {
+      "slug": "funerals",
+      "name": "Funerals",
+      "driveUrl": "",
+      "thumbnail": ""
     }
   ],
   "contact": {
