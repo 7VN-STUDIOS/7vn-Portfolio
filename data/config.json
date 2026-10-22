@@ -1,16 +1,28 @@
 {
   "categories": [
     {
+      "slug": "weddings",
+      "name": "Weddings",
+      "driveUrl": "",
+      "thumbnail": ""
+    },
+    {
+      "slug": "funerals",
+      "name": "Funerals",
+      "driveUrl": "",
+      "thumbnail": ""
+    }
+    {
       "slug": "events",
       "name": "Events",
       "driveUrl": "",
-      "thumbnail": "assets/uploads/thumb-1789601038042.jpg"
+      "thumbnail": ""
     },
     {
       "slug": "youtube",
       "name": "YouTube",
       "driveUrl": "",
-      "thumbnail": "assets/uploads/thumb-1789601105215.jpg"
+      "thumbnail": ""
     },
     {
       "slug": "reels",
@@ -21,18 +33,6 @@
     {
       "slug": "motion-designs",
       "name": "Motion Designs",
-      "driveUrl": "",
-      "thumbnail": ""
-    },
-    {
-      "slug": "weddings",
-      "name": "Weddings",
-      "driveUrl": "",
-      "thumbnail": ""
-    },
-    {
-      "slug": "funerals",
-      "name": "Funerals",
       "driveUrl": "",
       "thumbnail": ""
     }
