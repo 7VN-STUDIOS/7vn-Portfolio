@@ -44,22 +44,23 @@
   "services": [
     {
       "name": "Event Coverage",
+      "price": "Available Nationwide",
       "description": "Professional photography and videography for weddings, funerals, and corporate events, capturing important moments and preserving them in lasting memories."
     },
     {
       "name": "Marketing Videos",
-      "price": "Starting at ₦PLACEHOLDER",
-      "description": "Brand and product videos built to convert."
+      "price": "Tailored to your Brand Needs",
+      "description": "Creative brand and product videos designed to communicate your message, showcase your value, and capture attention."
     },
     {
       "name": "Motion Design",
-      "price": "Starting at ₦PLACEHOLDER",
-      "description": "Animated motion graphics for brands."
+      "price": "Custom Animations",
+      "description": "Creative motion graphics and logo animation that bring ideas to life."
     },
     {
       "name": "Creator Editing",
-      "price": "Starting at ₦PLACEHOLDER",
-      "description": "Video editing for YouTube and social creators."
+      "price": "Custom Packages Available",
+      "description": "Polished, engaging video edits for YouTubers and social media creators, ready to publish and built to keep audiences watching."
     }
   ]
 }
